@@ -21,10 +21,10 @@ const customTheme = createTheme({
     Input: {
       styles: () => ({
         input: {
-          borderColor: "green",
+          borderColor: "var(--mantine-color-primary-4)",
 
           "&:focus, &:focus-within": {
-            borderColor: "green",
+            borderColor: "var(--mantine-color-primary-6)",
           },
         },
       }),
@@ -37,10 +37,10 @@ const customTheme = createTheme({
     TextInput: {
       styles: () => ({
         input: {
-          borderColor: "green",
+          borderColor: "var(--mantine-color-primary-4)",
 
           "&:focus, &:focus-within": {
-            borderColor: "green",
+            borderColor: "var(--mantine-color-primary-6)",
           },
         },
       }),
@@ -71,10 +71,22 @@ const customTheme = createTheme({
       "#154b28",
       "#0a2714",
     ],
+    bri: [
+      "#eaf0f7",
+      "#d5e2ef",
+      "#abc5df",
+      "#81a7cf",
+      "#5789bf",
+      "#2d6baf",
+      "#005596",
+      "#004b84",
+      "#003c6a",
+      "#002848",
+    ],
     primary: virtualColor({
       name: "primary",
-      dark: "green",
-      light: "green",
+      dark: "bri",
+      light: "bri",
     }),
   },
   fontFamily: "Inter, sans-serif",

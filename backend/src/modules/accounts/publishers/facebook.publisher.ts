@@ -40,7 +40,7 @@ async function getTopProfilePostHref(
 
   await page.goto(`https://www.facebook.com/${profilePath}`, {
     waitUntil: 'domcontentloaded',
-    timeout: 30000,
+    timeout: 15000,
   });
   await page.waitForTimeout(2000);
 
@@ -88,8 +88,8 @@ async function waitForNewPostUrl(
   account: AccountEntity,
   previousTopPostHref: string | null,
 ): Promise<string | null> {
-  const maxAttempts = 12;
-  const retryDelayMs = 5000;
+  const maxAttempts = 8;
+  const retryDelayMs = 3000;
   const previousIdentity = previousTopPostHref
     ? extractPostIdentity(previousTopPostHref)
     : null;
@@ -105,7 +105,9 @@ async function waitForNewPostUrl(
     if (lastHref && extractPostIdentity(lastHref) !== previousIdentity) {
       break;
     }
-    await page.waitForTimeout(retryDelayMs);
+
+    if (page.isClosed()) return null;
+    await page.waitForTimeout(retryDelayMs).catch(() => {});
   }
 
   if (!lastHref) return null;
@@ -216,9 +218,13 @@ export class FacebookPublisher {
 
         await fillComposerAndSubmit(page, options);
 
-        return {
-          postUrl: await waitForNewPostUrl(page, account, previousTopPostHref),
-        };
+        const postUrl = await waitForNewPostUrl(
+          page,
+          account,
+          previousTopPostHref,
+        ).catch(() => null);
+
+        return { postUrl };
       } finally {
         await page.close();
       }

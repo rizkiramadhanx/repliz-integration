@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -17,6 +18,7 @@ import { ResponseMeta } from '../../common/type/response';
 import { AccountsService } from '../accounts/accounts.service';
 import { DiscordObserverManager } from './worker/discord-observer.manager';
 import { InstagramObserverManager } from './worker/instagram-observer.manager';
+import { PostHistoryService } from '../post-history/post-history.service';
 
 @Injectable()
 export class AutoPostRulesService {
@@ -26,6 +28,7 @@ export class AutoPostRulesService {
     private readonly accountsService: AccountsService,
     private readonly discordObserverManager: DiscordObserverManager,
     private readonly instagramObserverManager: InstagramObserverManager,
+    private readonly postHistoryService: PostHistoryService,
   ) {}
 
   private serialize(rule: AutoPostRuleEntity) {
@@ -393,6 +396,15 @@ export class AutoPostRulesService {
 
     if (!rule.isActive) {
       throw new BadRequestException('Rule sedang nonaktif');
+    }
+
+    const stillRunning = await this.postHistoryService.hasPendingForRule(
+      rule.id,
+    );
+    if (stillRunning) {
+      throw new ConflictException(
+        'Aturan ini masih berjalan, tunggu beberapa saat sebelum menjalankan lagi',
+      );
     }
 
     if (rule.triggerType === 'discord_observer') {

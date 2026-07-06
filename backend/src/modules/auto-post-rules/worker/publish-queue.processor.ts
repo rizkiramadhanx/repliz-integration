@@ -158,7 +158,10 @@ export class PublishQueueProcessor extends WorkerHost {
   @OnWorkerEvent('completed')
   async onCompleted(job: Job<PublishJobData, PublishJobResult>) {
     if (!job.data.postHistoryId) return;
-    await this.postHistoryService.update(job.data.postHistoryId, {
+    // updateIfStillPending: kalau row sudah ditandai 'failed' manual lewat
+    // tombol "Hentikan Proses" sebelum job ini benar-benar selesai, jangan
+    // ditimpa lagi jadi 'success'.
+    await this.postHistoryService.updateIfStillPending(job.data.postHistoryId, {
       status: 'success',
       postUrl: job.returnvalue?.postUrl ?? null,
     });
@@ -172,7 +175,7 @@ export class PublishQueueProcessor extends WorkerHost {
     );
     if (job.attemptsMade < (job.opts.attempts ?? 1)) return;
     if (!job.data.postHistoryId) return;
-    await this.postHistoryService.update(job.data.postHistoryId, {
+    await this.postHistoryService.updateIfStillPending(job.data.postHistoryId, {
       status: 'failed',
       errorMessage: err instanceof Error ? err.message : 'Unknown error',
     });

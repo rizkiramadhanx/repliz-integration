@@ -3,6 +3,7 @@ import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { AutoPostRuleEntity } from '../entities/auto-post-rule.entity';
 import { PostHistoryMediaType } from '../../post-history/entities/post-history.entity';
+import { PostHistoryService } from '../../post-history/post-history.service';
 import { PublishJobData } from './publish-queue.processor';
 import { PUBLISH_QUEUE_NAME } from './publish-queue.constants';
 
@@ -28,6 +29,7 @@ export class PublishTargetsService {
   constructor(
     @InjectQueue(PUBLISH_QUEUE_NAME)
     private readonly publishQueue: Queue<PublishJobData>,
+    private readonly postHistoryService: PostHistoryService,
   ) {}
 
   async publishToTargets(
@@ -144,5 +146,12 @@ export class PublishTargetsService {
     const active = counts.active ?? 0;
     const delayed = counts.delayed ?? 0;
     return { waiting, active, delayed, total: waiting + active + delayed };
+  }
+
+  async stopQueue(): Promise<void> {
+    await this.publishQueue.drain(true);
+    await this.postHistoryService.markAllPendingAsFailed(
+      'Dihentikan manual oleh user',
+    );
   }
 }

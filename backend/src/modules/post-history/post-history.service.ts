@@ -95,6 +95,33 @@ export class PostHistoryService {
     await this.postHistoryRepo.update(id, patch);
   }
 
+  /**
+   * Sama seperti update(), tapi hanya menimpa row yang statusnya masih
+   * 'pending' — mencegah event BullMQ (completed/failed) yang datang
+   * terlambat menimpa row yang sudah di-declare 'failed' secara manual
+   * lewat tombol "Hentikan Proses".
+   */
+  async updateIfStillPending(
+    id: string,
+    patch: UpdatePostHistoryInput,
+  ): Promise<void> {
+    await this.postHistoryRepo.update({ id, status: 'pending' }, patch);
+  }
+
+  async hasPendingForRule(ruleId: string): Promise<boolean> {
+    const count = await this.postHistoryRepo.count({
+      where: { ruleId, status: 'pending' },
+    });
+    return count > 0;
+  }
+
+  async markAllPendingAsFailed(errorMessage: string): Promise<void> {
+    await this.postHistoryRepo.update(
+      { status: 'pending' },
+      { status: 'failed', errorMessage },
+    );
+  }
+
   async findAll(pagination: PaginationDto, filters: FindAllPostHistoryFilters) {
     const { page = 1, limit = 10 } = pagination;
     const skip = (page - 1) * limit;

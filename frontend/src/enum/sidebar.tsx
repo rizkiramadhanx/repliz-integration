@@ -46,13 +46,13 @@ const SidebarMenu: SidebarMenuItem[] = [
         path: ROUTES.MasterData.Account.View,
         modules: [MODULE_LIST.MasterData.Account.Read],
       },
-      {
-        title: "Auto Post Rule",
-        icon: <MdRule />,
-        path: ROUTES.MasterData.AutoPostRule.View,
-        modules: [MODULE_LIST.MasterData.AutoPostRule.Read],
-      },
     ],
+  },
+  {
+    title: "Auto Post Rule",
+    icon: <MdRule />,
+    path: ROUTES.MasterData.AutoPostRule.View,
+    modules: [MODULE_LIST.MasterData.AutoPostRule.Read],
   },
   {
     title: "Log Aktivitas",

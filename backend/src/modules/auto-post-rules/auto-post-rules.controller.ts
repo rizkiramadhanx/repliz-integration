@@ -60,6 +60,23 @@ export class AutoPostRulesController {
     }
   }
 
+  @Post('queue-status/stop')
+  @Permissions('auto-post-rule:run')
+  async stopQueue(@Res({ passthrough: true }) res: Response) {
+    try {
+      await this.publishTargetsService.stopQueue();
+      res.status(HttpStatus.OK);
+      return createSuccessResponse('Antrian publish dihentikan', true);
+    } catch (err) {
+      console.error('Failed stop queue', err);
+      res.status(HttpStatus.INTERNAL_SERVER_ERROR);
+      return createErrorResponse(
+        'Failed to stop queue',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
   @Get()
   @Permissions('auto-post-rule:read')
   async all(

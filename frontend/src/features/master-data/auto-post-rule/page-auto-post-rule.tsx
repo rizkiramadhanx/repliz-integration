@@ -6,6 +6,7 @@ import useGetAllAutoPostRule from "@/features/master-data/auto-post-rule/hooks/u
 import useGetQueueStatus from "@/features/master-data/auto-post-rule/hooks/useGetQueueStatus";
 import useMutateDeleteAutoPostRule from "@/features/master-data/auto-post-rule/hooks/useMutateDeleteAutoPostRule";
 import useMutateRunNowAutoPostRule from "@/features/master-data/auto-post-rule/hooks/useMutateRunNowAutoPostRule";
+import useMutateStopQueue from "@/features/master-data/auto-post-rule/hooks/useMutateStopQueue";
 import type { typeDataAutoPostRule } from "@/features/master-data/auto-post-rule/type";
 import { useDebounceCallback } from "@/hooks/useDebounceCallback";
 import dayjs from "@/libs/dayjs";
@@ -138,21 +139,55 @@ export default function PageAutoPostRule() {
   const meta = dataRule?.data?.meta;
   const totalPages = meta?.total_page ?? 0;
 
-  const { data: queueStatus } = useGetQueueStatus();
+  const { data: queueStatus, refetch: refetchQueueStatus } =
+    useGetQueueStatus();
   const queueTotal = queueStatus?.data?.total ?? 0;
+
+  const { mutate: stopQueue, isPending: isStoppingQueue } =
+    useMutateStopQueue();
+
+  const handleStopQueue = () => {
+    stopQueue(undefined, {
+      onSuccess: () => {
+        refetchQueueStatus();
+        notifications.show({
+          title: "Sukses",
+          message: "Antrian publish dihentikan",
+          color: "green",
+        });
+      },
+      onError: (err: unknown) => {
+        const axErr = err as { response?: { data?: { message?: string } } };
+        const msg =
+          axErr?.response?.data?.message ?? "Gagal menghentikan antrian";
+        notifications.show({ title: "Error", message: msg, color: "red" });
+      },
+    });
+  };
 
   return (
     <Box px={20} py={10}>
-      <Group mb="md">
+      <Group mb="md" justify="space-between">
+        <Group>
+          <Button
+            variant="filled"
+            color="primary"
+            size="xs"
+            onClick={() => navigate(-1)}
+          >
+            <TiArrowBack />
+          </Button>
+          <Text fw={600}>Auto Post Rule</Text>
+        </Group>
         <Button
-          variant="filled"
-          color="primary"
           size="xs"
-          onClick={() => navigate(-1)}
+          color="red"
+          variant="light"
+          loading={isStoppingQueue}
+          onClick={handleStopQueue}
         >
-          <TiArrowBack />
+          Hentikan Proses
         </Button>
-        <Text fw={600}>Auto Post Rule</Text>
       </Group>
       {queueTotal > 0 && (
         <Alert

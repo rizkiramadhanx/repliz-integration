@@ -1,5 +1,6 @@
 import useGetAllAutoPostRule from "@/features/master-data/auto-post-rule/hooks/useGetAllAutoPostRule";
 import useGetQueueStatus from "@/features/master-data/auto-post-rule/hooks/useGetQueueStatus";
+import useMutateStopQueue from "@/features/master-data/auto-post-rule/hooks/useMutateStopQueue";
 import useGetAllPostHistory from "@/features/post-history/hooks/useGetAllPostHistory";
 import type { typeDataPostHistory } from "@/features/post-history/type";
 import PaginationTotal from "@/components/moleculs/PaginationTotal";
@@ -17,6 +18,7 @@ import {
   Text,
   Tooltip,
 } from "@mantine/core";
+import { notifications } from "@mantine/notifications";
 import { useState } from "react";
 import { MdOutlineInfo } from "react-icons/md";
 import { TiArrowBack } from "react-icons/ti";
@@ -90,21 +92,55 @@ export default function PagePostHistory() {
   const meta = dataHistory?.data?.meta;
   const totalPages = meta?.total_page ?? 0;
 
-  const { data: queueStatus } = useGetQueueStatus();
+  const { data: queueStatus, refetch: refetchQueueStatus } =
+    useGetQueueStatus();
   const queueTotal = queueStatus?.data?.total ?? 0;
+
+  const { mutate: stopQueue, isPending: isStoppingQueue } =
+    useMutateStopQueue();
+
+  const handleStopQueue = () => {
+    stopQueue(undefined, {
+      onSuccess: () => {
+        refetchQueueStatus();
+        notifications.show({
+          title: "Sukses",
+          message: "Antrian publish dihentikan",
+          color: "green",
+        });
+      },
+      onError: (err: unknown) => {
+        const axErr = err as { response?: { data?: { message?: string } } };
+        const msg =
+          axErr?.response?.data?.message ?? "Gagal menghentikan antrian";
+        notifications.show({ title: "Error", message: msg, color: "red" });
+      },
+    });
+  };
 
   return (
     <Box px={20} py={10}>
-      <Group mb="md">
+      <Group mb="md" justify="space-between">
+        <Group>
+          <Button
+            variant="filled"
+            color="primary"
+            size="xs"
+            onClick={() => navigate(-1)}
+          >
+            <TiArrowBack />
+          </Button>
+          <Text fw={600}>Riwayat Post</Text>
+        </Group>
         <Button
-          variant="filled"
-          color="primary"
           size="xs"
-          onClick={() => navigate(-1)}
+          color="red"
+          variant="light"
+          loading={isStoppingQueue}
+          onClick={handleStopQueue}
         >
-          <TiArrowBack />
+          Hentikan Proses
         </Button>
-        <Text fw={600}>Riwayat Post</Text>
       </Group>
       {queueTotal > 0 && (
         <Alert
