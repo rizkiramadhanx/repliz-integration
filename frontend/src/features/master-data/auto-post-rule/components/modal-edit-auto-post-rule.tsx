@@ -1,12 +1,17 @@
 import useGetAllAccount from "@/features/master-data/account/hooks/useGetAllAccount";
 import type { typeDataAccount } from "@/features/master-data/account/type";
 import CaptionFields from "@/features/master-data/auto-post-rule/components/caption-fields";
+import InstagramObserverSourceFields from "@/features/master-data/auto-post-rule/components/instagram-observer-source-fields";
 import MediaTypesFields from "@/features/master-data/auto-post-rule/components/media-types-fields";
 import TargetsFields from "@/features/master-data/auto-post-rule/components/targets-fields";
 import useMutateEditAutoPostRule from "@/features/master-data/auto-post-rule/hooks/useMutateEditAutoPostRule";
-import type { typeDataAutoPostRule } from "@/features/master-data/auto-post-rule/type";
+import type {
+  typeAutoPostTriggerType,
+  typeDataAutoPostRule,
+} from "@/features/master-data/auto-post-rule/type";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
+  Badge,
   Button,
   Divider,
   Group,
@@ -27,10 +32,13 @@ import { z } from "zod";
 
 const schema = z.object({
   name: z.string().min(1, "Nama aturan wajib diisi").max(255),
-  discordAccountId: z.string().min(1, "Pilih akun Discord sumber"),
-  discordChannelIds: z
-    .array(z.string())
-    .min(1, "Isi minimal satu channel ID"),
+  discordAccountId: z.string().optional(),
+  discordChannelIds: z.array(z.string()).optional(),
+  instagramObserverAccountId: z.string().optional(),
+  instagramTargetUsernames: z.array(z.string()).optional(),
+  excludeKeywords: z.array(z.string()).optional(),
+  includeOriginalCaption: z.boolean(),
+  instagramCheckIntervalMinutes: z.number().optional(),
   targets: z
     .array(z.enum(["facebook", "instagram", "telegram", "twitter"]))
     .min(1, "Pilih minimal satu target platform"),
@@ -55,6 +63,11 @@ const schema = z.object({
 
 export type EditAutoPostRuleSchema = z.infer<typeof schema>;
 
+const TRIGGER_TYPE_LABEL: Record<typeAutoPostTriggerType, string> = {
+  discord_observer: "Observer Discord",
+  instagram_observer: "Observer Instagram",
+};
+
 function toFormValues(
   rule: typeDataAutoPostRule | null,
 ): EditAutoPostRuleSchema {
@@ -62,6 +75,13 @@ function toFormValues(
     name: rule?.name ?? "",
     discordAccountId: rule?.discord_account_id ?? "",
     discordChannelIds: rule?.discord_channel_ids ?? [],
+    instagramObserverAccountId:
+      rule?.instagram_observer_account_id ?? undefined,
+    instagramTargetUsernames: rule?.instagram_target_usernames ?? [],
+    excludeKeywords: rule?.exclude_keywords ?? [],
+    includeOriginalCaption: rule?.include_original_caption ?? true,
+    instagramCheckIntervalMinutes:
+      rule?.instagram_check_interval_minutes ?? 60,
     targets: rule?.targets ?? [],
     facebookAccountId: rule?.facebook_account_id ?? undefined,
     facebookPostMode: rule?.facebook_post_mode ?? "wall",
@@ -109,6 +129,9 @@ export default function ModalEditAutoPostRule({
     }
   }, [defaultValue, reset]);
 
+  const triggerType: typeAutoPostTriggerType =
+    defaultValue?.trigger_type ?? "discord_observer";
+
   const { data: accountData } = useGetAllAccount({ page: 1, limit: 100 });
   const discordAccounts: typeDataAccount[] = (
     accountData?.data?.data ?? []
@@ -129,8 +152,34 @@ export default function ModalEditAutoPostRule({
         ruleId: defaultValue.id,
         payload: {
           name: dataForm.name,
-          discordAccountId: dataForm.discordAccountId,
-          discordChannelIds: dataForm.discordChannelIds,
+          discordAccountId:
+            triggerType === "discord_observer"
+              ? dataForm.discordAccountId
+              : undefined,
+          discordChannelIds:
+            triggerType === "discord_observer"
+              ? dataForm.discordChannelIds
+              : undefined,
+          instagramObserverAccountId:
+            triggerType === "instagram_observer"
+              ? dataForm.instagramObserverAccountId
+              : undefined,
+          instagramTargetUsernames:
+            triggerType === "instagram_observer"
+              ? dataForm.instagramTargetUsernames
+              : undefined,
+          excludeKeywords:
+            triggerType === "instagram_observer"
+              ? dataForm.excludeKeywords
+              : undefined,
+          includeOriginalCaption:
+            triggerType === "instagram_observer"
+              ? dataForm.includeOriginalCaption
+              : undefined,
+          instagramCheckIntervalMinutes:
+            triggerType === "instagram_observer"
+              ? dataForm.instagramCheckIntervalMinutes
+              : undefined,
           targets: dataForm.targets,
           facebookAccountId: dataForm.targets.includes("facebook")
             ? dataForm.facebookAccountId
@@ -195,6 +244,15 @@ export default function ModalEditAutoPostRule({
       <ScrollArea.Autosize mah="70vh">
         <form onSubmit={handleSubmit(onSubmit)} noValidate>
           <Stack gap="sm">
+            <Group justify="space-between">
+              <Text size="xs" c="dimmed">
+                Tipe trigger
+              </Text>
+              <Badge variant="light">
+                {TRIGGER_TYPE_LABEL[triggerType]}
+              </Badge>
+            </Group>
+
             <TextInput
               label="Nama Aturan"
               placeholder="Contoh: Repost Channel Promo ke Semua Platform"
@@ -203,32 +261,79 @@ export default function ModalEditAutoPostRule({
               {...register("name")}
             />
 
-            <Divider label="Sumber Discord" labelPosition="left" />
-            <Select
-              label="Akun Discord"
-              placeholder="Pilih akun Discord sumber"
-              data={discordAccounts.map((a) => ({
-                value: a.id,
-                label: a.label,
-              }))}
-              value={formValue.discordAccountId || null}
-              onChange={(val) =>
-                setValue("discordAccountId", val ?? "", {
-                  shouldValidate: true,
-                })
-              }
-              error={errors.discordAccountId?.message}
-            />
-            <TagsInput
-              label="Channel ID Discord"
-              description="Tekan Enter untuk menambah channel ID"
-              placeholder="mis. 123456789012345678"
-              value={formValue.discordChannelIds}
-              onChange={(val) =>
-                setValue("discordChannelIds", val, { shouldValidate: true })
-              }
-              error={errors.discordChannelIds?.message}
-            />
+            {triggerType === "discord_observer" ? (
+              <>
+                <Divider label="Sumber Discord" labelPosition="left" />
+                <Select
+                  label="Akun Discord"
+                  placeholder="Pilih akun Discord sumber"
+                  data={discordAccounts.map((a) => ({
+                    value: a.id,
+                    label: a.label,
+                  }))}
+                  value={formValue.discordAccountId || null}
+                  onChange={(val) =>
+                    setValue("discordAccountId", val ?? "", {
+                      shouldValidate: true,
+                    })
+                  }
+                  error={errors.discordAccountId?.message}
+                />
+                <TagsInput
+                  label="Channel ID Discord"
+                  description="Tekan Enter untuk menambah channel ID"
+                  placeholder="mis. 123456789012345678"
+                  value={formValue.discordChannelIds ?? []}
+                  onChange={(val) =>
+                    setValue("discordChannelIds", val, {
+                      shouldValidate: true,
+                    })
+                  }
+                  error={errors.discordChannelIds?.message}
+                />
+              </>
+            ) : (
+              <>
+                <Divider label="Sumber Instagram" labelPosition="left" />
+                <InstagramObserverSourceFields
+                  value={{
+                    instagramObserverAccountId:
+                      formValue.instagramObserverAccountId,
+                    instagramTargetUsernames:
+                      formValue.instagramTargetUsernames ?? [],
+                    excludeKeywords: formValue.excludeKeywords ?? [],
+                    includeOriginalCaption: formValue.includeOriginalCaption,
+                    instagramCheckIntervalMinutes:
+                      formValue.instagramCheckIntervalMinutes,
+                  }}
+                  onChange={(next) => {
+                    setValue(
+                      "instagramObserverAccountId",
+                      next.instagramObserverAccountId,
+                      { shouldValidate: true },
+                    );
+                    setValue(
+                      "instagramTargetUsernames",
+                      next.instagramTargetUsernames,
+                      { shouldValidate: true },
+                    );
+                    setValue("excludeKeywords", next.excludeKeywords, {
+                      shouldValidate: true,
+                    });
+                    setValue(
+                      "includeOriginalCaption",
+                      next.includeOriginalCaption,
+                      { shouldValidate: true },
+                    );
+                    setValue(
+                      "instagramCheckIntervalMinutes",
+                      next.instagramCheckIntervalMinutes,
+                      { shouldValidate: true },
+                    );
+                  }}
+                />
+              </>
+            )}
 
             <Divider label="Target" labelPosition="left" />
             <TargetsFields
@@ -298,16 +403,20 @@ export default function ModalEditAutoPostRule({
               }}
             />
 
-            <Divider label="Pengaturan" labelPosition="left" />
-            <Group>
-              <Switch
-                label="Save Mode (hanya proses 1 pesan terakhir per trigger)"
-                checked={formValue.saveMode}
-                onChange={(e) =>
-                  setValue("saveMode", e.currentTarget.checked)
-                }
-              />
-            </Group>
+            {triggerType === "discord_observer" && (
+              <>
+                <Divider label="Pengaturan" labelPosition="left" />
+                <Group>
+                  <Switch
+                    label="Save Mode (hanya proses 1 pesan terakhir per trigger)"
+                    checked={formValue.saveMode}
+                    onChange={(e) =>
+                      setValue("saveMode", e.currentTarget.checked)
+                    }
+                  />
+                </Group>
+              </>
+            )}
             <Group>
               <Switch
                 label="Aktif"

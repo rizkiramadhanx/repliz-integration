@@ -28,6 +28,7 @@ import {
 } from '../../common/type/response';
 import { CurrentUser, CurrentUserType } from '../../security/user.decorator';
 import { LogsService } from '../logs/logs.service';
+import { PublishTargetsService } from './worker/publish-targets';
 
 function isAdmin(user: CurrentUserType): boolean {
   return user?.role?.name === 'Admin';
@@ -39,7 +40,25 @@ export class AutoPostRulesController {
   constructor(
     private readonly autoPostRulesService: AutoPostRulesService,
     private readonly logsService: LogsService,
+    private readonly publishTargetsService: PublishTargetsService,
   ) {}
+
+  @Get('queue-status')
+  @Permissions('auto-post-rule:read')
+  async queueStatus(@Res({ passthrough: true }) res: Response) {
+    try {
+      const counts = await this.publishTargetsService.getQueueCounts();
+      res.status(HttpStatus.OK);
+      return createSuccessResponse('Queue status', counts);
+    } catch (err) {
+      console.error('Failed get queue status', err);
+      res.status(HttpStatus.INTERNAL_SERVER_ERROR);
+      return createErrorResponse(
+        'Failed to get queue status',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
 
   @Get()
   @Permissions('auto-post-rule:read')

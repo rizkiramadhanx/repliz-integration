@@ -9,12 +9,14 @@ import { Repository } from 'typeorm';
 import { AutoPostRuleEntity } from './entities/auto-post-rule.entity';
 import {
   CreateAutoPostRuleDto,
+  MIN_INSTAGRAM_OBSERVER_INTERVAL_MINUTES,
   UpdateAutoPostRuleDto,
 } from './dto/auto-post-rule.dto';
 import { PaginationDto } from '../../common/dto/pagination.dto';
 import { ResponseMeta } from '../../common/type/response';
 import { AccountsService } from '../accounts/accounts.service';
 import { DiscordObserverManager } from './worker/discord-observer.manager';
+import { InstagramObserverManager } from './worker/instagram-observer.manager';
 
 @Injectable()
 export class AutoPostRulesService {
@@ -23,14 +25,21 @@ export class AutoPostRulesService {
     private readonly ruleRepo: Repository<AutoPostRuleEntity>,
     private readonly accountsService: AccountsService,
     private readonly discordObserverManager: DiscordObserverManager,
+    private readonly instagramObserverManager: InstagramObserverManager,
   ) {}
 
   private serialize(rule: AutoPostRuleEntity) {
     return {
       id: rule.id,
       name: rule.name,
+      trigger_type: rule.triggerType,
       discord_account_id: rule.discordAccountId,
       discord_channel_ids: rule.discordChannelIds,
+      instagram_observer_account_id: rule.instagramObserverAccountId,
+      instagram_target_usernames: rule.instagramTargetUsernames,
+      exclude_keywords: rule.excludeKeywords,
+      include_original_caption: rule.includeOriginalCaption,
+      instagram_check_interval_minutes: rule.instagramCheckIntervalMinutes,
       targets: rule.targets,
       facebook_account_id: rule.facebookAccountId,
       facebook_post_mode: rule.facebookPostMode,
@@ -54,15 +63,59 @@ export class AutoPostRulesService {
     dto: CreateAutoPostRuleDto | UpdateAutoPostRuleDto,
     existing?: AutoPostRuleEntity,
   ): void {
+    const triggerType = dto.triggerType ?? existing?.triggerType;
+    if (!triggerType) {
+      throw new BadRequestException('triggerType wajib diisi');
+    }
+
+    if (triggerType === 'discord_observer') {
+      const discordAccountId =
+        dto.discordAccountId ?? existing?.discordAccountId;
+      if (!discordAccountId) {
+        throw new BadRequestException(
+          'discordAccountId wajib diisi untuk trigger discord_observer',
+        );
+      }
+      const discordChannelIds =
+        dto.discordChannelIds ?? existing?.discordChannelIds;
+      if (!discordChannelIds || discordChannelIds.length === 0) {
+        throw new BadRequestException(
+          'discordChannelIds wajib diisi untuk trigger discord_observer',
+        );
+      }
+    }
+
+    if (triggerType === 'instagram_observer') {
+      const instagramObserverAccountId =
+        dto.instagramObserverAccountId ?? existing?.instagramObserverAccountId;
+      if (!instagramObserverAccountId) {
+        throw new BadRequestException(
+          'instagramObserverAccountId wajib diisi untuk trigger instagram_observer',
+        );
+      }
+      const instagramTargetUsernames =
+        dto.instagramTargetUsernames ?? existing?.instagramTargetUsernames;
+      if (!instagramTargetUsernames || instagramTargetUsernames.length === 0) {
+        throw new BadRequestException(
+          'instagramTargetUsernames wajib diisi untuk trigger instagram_observer',
+        );
+      }
+      const instagramCheckIntervalMinutes =
+        dto.instagramCheckIntervalMinutes ??
+        existing?.instagramCheckIntervalMinutes;
+      if (
+        !instagramCheckIntervalMinutes ||
+        instagramCheckIntervalMinutes < MIN_INSTAGRAM_OBSERVER_INTERVAL_MINUTES
+      ) {
+        throw new BadRequestException(
+          `instagramCheckIntervalMinutes minimal ${MIN_INSTAGRAM_OBSERVER_INTERVAL_MINUTES} menit untuk menghindari rate-limit/ban dari Instagram`,
+        );
+      }
+    }
+
     const targets = dto.targets ?? existing?.targets;
     if (!targets || targets.length === 0) {
       throw new BadRequestException('Pilih minimal satu target platform');
-    }
-
-    const discordChannelIds =
-      dto.discordChannelIds ?? existing?.discordChannelIds;
-    if (!discordChannelIds || discordChannelIds.length === 0) {
-      throw new BadRequestException('discordChannelIds wajib diisi');
     }
 
     const mediaTypes = dto.mediaTypes ?? existing?.mediaTypes;
@@ -137,6 +190,7 @@ export class AutoPostRulesService {
 
     const accountIds = [
       dto.discordAccountId ?? existing?.discordAccountId,
+      dto.instagramObserverAccountId ?? existing?.instagramObserverAccountId,
       dto.facebookAccountId ?? existing?.facebookAccountId,
       dto.instagramAccountId ?? existing?.instagramAccountId,
       dto.twitterAccountId ?? existing?.twitterAccountId,
@@ -153,6 +207,18 @@ export class AutoPostRulesService {
     }
   }
 
+  private async reloadObserver(rule: AutoPostRuleEntity): Promise<void> {
+    if (rule.triggerType === 'discord_observer') {
+      if (rule.discordAccountId) {
+        await this.discordObserverManager.reloadForAccount(
+          rule.discordAccountId,
+        );
+      }
+    } else {
+      await this.instagramObserverManager.reloadForRule(rule.id);
+    }
+  }
+
   async create(dto: CreateAutoPostRuleDto, userId: string, isAdmin: boolean) {
     this.validateRule(dto);
     await this.assertAccessToReferencedAccounts(
@@ -165,7 +231,7 @@ export class AutoPostRulesService {
     const rule = this.ruleRepo.create(dto);
     const saved = await this.ruleRepo.save(rule);
 
-    await this.discordObserverManager.reloadForAccount(saved.discordAccountId);
+    await this.reloadObserver(saved);
 
     return this.serialize(saved);
   }
@@ -185,14 +251,15 @@ export class AutoPostRulesService {
       .take(limit);
 
     if (!isAdmin) {
-      qb.innerJoin(
-        'accounts',
-        'discord_account',
-        'discord_account.id = rule.discordAccountId',
-      ).innerJoin(
-        'account_delegations',
-        'delegation',
-        'delegation.accountId = discord_account.id AND delegation.userId = :userId',
+      qb.andWhere(
+        `EXISTS (
+          SELECT 1 FROM account_delegations delegation
+          WHERE delegation.user_id = :userId
+          AND delegation.account_id IN (
+            rule.discord_account_id,
+            rule.instagram_observer_account_id
+          )
+        )`,
         { userId },
       );
     }
@@ -215,14 +282,20 @@ export class AutoPostRulesService {
     return rule;
   }
 
+  private sourceAccountId(rule: AutoPostRuleEntity): string | null {
+    return rule.triggerType === 'discord_observer'
+      ? rule.discordAccountId
+      : rule.instagramObserverAccountId;
+  }
+
   async getOneForUser(id: string, userId: string, isAdmin: boolean) {
     const rule = await this.findOrFail(id);
 
     if (!isAdmin) {
-      const hasAccess = await this.accountsService.hasAccess(
-        rule.discordAccountId,
-        userId,
-      );
+      const sourceAccountId = this.sourceAccountId(rule);
+      const hasAccess = sourceAccountId
+        ? await this.accountsService.hasAccess(sourceAccountId, userId)
+        : false;
       if (!hasAccess) {
         throw new ForbiddenException('You do not have access to this rule');
       }
@@ -240,10 +313,10 @@ export class AutoPostRulesService {
     const rule = await this.findOrFail(id);
 
     if (!isAdmin) {
-      const hasAccess = await this.accountsService.hasAccess(
-        rule.discordAccountId,
-        userId,
-      );
+      const sourceAccountId = this.sourceAccountId(rule);
+      const hasAccess = sourceAccountId
+        ? await this.accountsService.hasAccess(sourceAccountId, userId)
+        : false;
       if (!hasAccess) {
         throw new ForbiddenException('You do not have access to this rule');
       }
@@ -252,18 +325,31 @@ export class AutoPostRulesService {
     this.validateRule(dto, rule);
     await this.assertAccessToReferencedAccounts(dto, rule, userId, isAdmin);
 
+    const previousTriggerType = rule.triggerType;
     const previousDiscordAccountId = rule.discordAccountId;
     Object.assign(rule, dto);
     const saved = await this.ruleRepo.save(rule);
 
-    await this.discordObserverManager.reloadForAccount(
-      previousDiscordAccountId,
-    );
-    if (saved.discordAccountId !== previousDiscordAccountId) {
+    // Reload observer lama kalau trigger type atau akun Discord sumbernya berubah,
+    // supaya listener/interval lama benar-benar berhenti (bukan cuma yang baru didaftarkan).
+    if (
+      previousTriggerType === 'discord_observer' &&
+      previousDiscordAccountId &&
+      (previousTriggerType !== saved.triggerType ||
+        previousDiscordAccountId !== saved.discordAccountId)
+    ) {
       await this.discordObserverManager.reloadForAccount(
-        saved.discordAccountId,
+        previousDiscordAccountId,
       );
     }
+    if (
+      previousTriggerType === 'instagram_observer' &&
+      previousTriggerType !== saved.triggerType
+    ) {
+      this.instagramObserverManager.stopRule(saved.id);
+    }
+
+    await this.reloadObserver(saved);
 
     return this.serialize(saved);
   }
@@ -272,17 +358,22 @@ export class AutoPostRulesService {
     const rule = await this.findOrFail(id);
 
     if (!isAdmin) {
-      const hasAccess = await this.accountsService.hasAccess(
-        rule.discordAccountId,
-        userId,
-      );
+      const sourceAccountId = this.sourceAccountId(rule);
+      const hasAccess = sourceAccountId
+        ? await this.accountsService.hasAccess(sourceAccountId, userId)
+        : false;
       if (!hasAccess) {
         throw new ForbiddenException('You do not have access to this rule');
       }
     }
 
     await this.ruleRepo.delete(id);
-    await this.discordObserverManager.reloadForAccount(rule.discordAccountId);
+
+    if (rule.triggerType === 'discord_observer' && rule.discordAccountId) {
+      await this.discordObserverManager.reloadForAccount(rule.discordAccountId);
+    } else {
+      this.instagramObserverManager.stopRule(rule.id);
+    }
 
     return true;
   }
@@ -291,10 +382,10 @@ export class AutoPostRulesService {
     const rule = await this.findOrFail(id);
 
     if (!isAdmin) {
-      const hasAccess = await this.accountsService.hasAccess(
-        rule.discordAccountId,
-        userId,
-      );
+      const sourceAccountId = this.sourceAccountId(rule);
+      const hasAccess = sourceAccountId
+        ? await this.accountsService.hasAccess(sourceAccountId, userId)
+        : false;
       if (!hasAccess) {
         throw new ForbiddenException('You do not have access to this rule');
       }
@@ -304,6 +395,9 @@ export class AutoPostRulesService {
       throw new BadRequestException('Rule sedang nonaktif');
     }
 
-    return this.discordObserverManager.runRuleNow(rule.id);
+    if (rule.triggerType === 'discord_observer') {
+      return this.discordObserverManager.runRuleNow(rule.id);
+    }
+    return this.instagramObserverManager.runRuleNow(rule.id);
   }
 }

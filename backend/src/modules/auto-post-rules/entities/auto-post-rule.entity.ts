@@ -7,6 +7,12 @@ import {
 } from 'typeorm';
 import { Expose } from 'class-transformer';
 
+export const AUTO_POST_TRIGGER_TYPES = [
+  'discord_observer',
+  'instagram_observer',
+] as const;
+export type AutoPostTriggerType = (typeof AUTO_POST_TRIGGER_TYPES)[number];
+
 export const AUTO_POST_TARGETS = [
   'facebook',
   'instagram',
@@ -36,13 +42,53 @@ export class AutoPostRuleEntity {
   @Expose({ name: 'name' })
   name: string;
 
-  @Column({ name: 'discord_account_id', type: 'uuid' })
-  @Expose({ name: 'discord_account_id' })
-  discordAccountId: string;
+  @Column({
+    name: 'trigger_type',
+    type: 'varchar',
+    default: 'discord_observer',
+  })
+  @Expose({ name: 'trigger_type' })
+  triggerType: AutoPostTriggerType;
 
-  @Column({ name: 'discord_channel_ids', type: 'jsonb' })
+  @Column({ name: 'discord_account_id', type: 'uuid', nullable: true })
+  @Expose({ name: 'discord_account_id' })
+  discordAccountId: string | null;
+
+  @Column({ name: 'discord_channel_ids', type: 'jsonb', nullable: true })
   @Expose({ name: 'discord_channel_ids' })
-  discordChannelIds: string[];
+  discordChannelIds: string[] | null;
+
+  @Column({
+    name: 'instagram_observer_account_id',
+    type: 'uuid',
+    nullable: true,
+  })
+  @Expose({ name: 'instagram_observer_account_id' })
+  instagramObserverAccountId: string | null;
+
+  @Column({
+    name: 'instagram_target_usernames',
+    type: 'jsonb',
+    nullable: true,
+  })
+  @Expose({ name: 'instagram_target_usernames' })
+  instagramTargetUsernames: string[] | null;
+
+  @Column({ name: 'exclude_keywords', type: 'jsonb', nullable: true })
+  @Expose({ name: 'exclude_keywords' })
+  excludeKeywords: string[] | null;
+
+  @Column({ name: 'include_original_caption', default: true })
+  @Expose({ name: 'include_original_caption' })
+  includeOriginalCaption: boolean;
+
+  @Column({
+    name: 'instagram_check_interval_minutes',
+    type: 'int',
+    nullable: true,
+  })
+  @Expose({ name: 'instagram_check_interval_minutes' })
+  instagramCheckIntervalMinutes: number | null;
 
   @Column({ type: 'jsonb' })
   @Expose({ name: 'targets' })

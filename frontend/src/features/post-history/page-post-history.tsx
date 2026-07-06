@@ -1,9 +1,11 @@
 import useGetAllAutoPostRule from "@/features/master-data/auto-post-rule/hooks/useGetAllAutoPostRule";
+import useGetQueueStatus from "@/features/master-data/auto-post-rule/hooks/useGetQueueStatus";
 import useGetAllPostHistory from "@/features/post-history/hooks/useGetAllPostHistory";
 import type { typeDataPostHistory } from "@/features/post-history/type";
 import PaginationTotal from "@/components/moleculs/PaginationTotal";
 import dayjs from "@/libs/dayjs";
 import {
+  Alert,
   Badge,
   Box,
   Button,
@@ -16,6 +18,7 @@ import {
   Tooltip,
 } from "@mantine/core";
 import { useState } from "react";
+import { MdOutlineInfo } from "react-icons/md";
 import { TiArrowBack } from "react-icons/ti";
 import { useNavigate } from "react-router";
 
@@ -87,6 +90,9 @@ export default function PagePostHistory() {
   const meta = dataHistory?.data?.meta;
   const totalPages = meta?.total_page ?? 0;
 
+  const { data: queueStatus } = useGetQueueStatus();
+  const queueTotal = queueStatus?.data?.total ?? 0;
+
   return (
     <Box px={20} py={10}>
       <Group mb="md">
@@ -100,6 +106,16 @@ export default function PagePostHistory() {
         </Button>
         <Text fw={600}>Riwayat Post</Text>
       </Group>
+      {queueTotal > 0 && (
+        <Alert
+          icon={<MdOutlineInfo size={18} />}
+          color="yellow"
+          variant="light"
+          mb="sm"
+        >
+          Terdapat {queueTotal} antrian post berjalan
+        </Alert>
+      )}
 
       <Flex
         display="flex"

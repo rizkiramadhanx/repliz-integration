@@ -17,6 +17,8 @@ export type PostHistoryMediaType = (typeof POST_HISTORY_MEDIA_TYPES)[number];
 export const POST_HISTORY_TRIGGER_SOURCES = [
   'discord_observer',
   'discord_run_now',
+  'instagram_observer',
+  'instagram_run_now',
 ] as const;
 export type PostHistoryTriggerSource =
   (typeof POST_HISTORY_TRIGGER_SOURCES)[number];

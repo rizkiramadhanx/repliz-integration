@@ -7,11 +7,12 @@ const DOWNLOAD_DIR = process.env.DOWNLOAD_PATH ?? '/tmp/auto-post-media';
 export async function downloadToTemp(
   url: string,
   filename: string,
+  headers?: Record<string, string>,
 ): Promise<string> {
   fs.mkdirSync(DOWNLOAD_DIR, { recursive: true });
   const destPath = path.join(DOWNLOAD_DIR, `${Date.now()}_${filename}`);
 
-  const res = await fetch(url);
+  const res = await fetch(url, { headers });
   if (!res.ok || !res.body) {
     throw new Error(`Failed to download media: ${url} (${res.status})`);
   }

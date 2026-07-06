@@ -1,3 +1,5 @@
+export type typeAutoPostTriggerType = "discord_observer" | "instagram_observer";
+
 export type typeAutoPostTarget =
   | "facebook"
   | "instagram"
@@ -16,8 +18,14 @@ export type typeCaptionReplacement = {
 export type typeDataAutoPostRule = {
   id: string;
   name: string;
-  discord_account_id: string;
-  discord_channel_ids: string[];
+  trigger_type: typeAutoPostTriggerType;
+  discord_account_id: string | null;
+  discord_channel_ids: string[] | null;
+  instagram_observer_account_id: string | null;
+  instagram_target_usernames: string[] | null;
+  exclude_keywords: string[] | null;
+  include_original_caption: boolean;
+  instagram_check_interval_minutes: number | null;
   targets: typeAutoPostTarget[];
   facebook_account_id: string | null;
   facebook_post_mode: typeFacebookPostMode | null;
@@ -38,8 +46,14 @@ export type typeDataAutoPostRule = {
 
 export type typeDataCreateAutoPostRulePayload = {
   name: string;
-  discordAccountId: string;
-  discordChannelIds: string[];
+  triggerType: typeAutoPostTriggerType;
+  discordAccountId?: string;
+  discordChannelIds?: string[];
+  instagramObserverAccountId?: string;
+  instagramTargetUsernames?: string[];
+  excludeKeywords?: string[];
+  includeOriginalCaption?: boolean;
+  instagramCheckIntervalMinutes?: number;
   targets: typeAutoPostTarget[];
   facebookAccountId?: string;
   facebookPostMode?: typeFacebookPostMode;

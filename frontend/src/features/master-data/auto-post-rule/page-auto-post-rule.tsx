@@ -3,12 +3,14 @@ import PaginationTotal from "@/components/moleculs/PaginationTotal";
 import ModalAddAutoPostRule from "@/features/master-data/auto-post-rule/components/modal-add-auto-post-rule";
 import ModalEditAutoPostRule from "@/features/master-data/auto-post-rule/components/modal-edit-auto-post-rule";
 import useGetAllAutoPostRule from "@/features/master-data/auto-post-rule/hooks/useGetAllAutoPostRule";
+import useGetQueueStatus from "@/features/master-data/auto-post-rule/hooks/useGetQueueStatus";
 import useMutateDeleteAutoPostRule from "@/features/master-data/auto-post-rule/hooks/useMutateDeleteAutoPostRule";
 import useMutateRunNowAutoPostRule from "@/features/master-data/auto-post-rule/hooks/useMutateRunNowAutoPostRule";
 import type { typeDataAutoPostRule } from "@/features/master-data/auto-post-rule/type";
 import { useDebounceCallback } from "@/hooks/useDebounceCallback";
 import dayjs from "@/libs/dayjs";
 import {
+  Alert,
   Badge,
   Box,
   Button,
@@ -23,8 +25,14 @@ import {
 import { notifications } from "@mantine/notifications";
 import { useState } from "react";
 import { CiSearch } from "react-icons/ci";
+import { MdOutlineInfo } from "react-icons/md";
 import { TiArrowBack } from "react-icons/ti";
 import { useNavigate } from "react-router";
+
+const TRIGGER_TYPE_LABEL: Record<string, string> = {
+  discord_observer: "Discord Observer",
+  instagram_observer: "Instagram Observer",
+};
 
 export default function PageAutoPostRule() {
   const navigate = useNavigate();
@@ -130,6 +138,9 @@ export default function PageAutoPostRule() {
   const meta = dataRule?.data?.meta;
   const totalPages = meta?.total_page ?? 0;
 
+  const { data: queueStatus } = useGetQueueStatus();
+  const queueTotal = queueStatus?.data?.total ?? 0;
+
   return (
     <Box px={20} py={10}>
       <Group mb="md">
@@ -143,6 +154,16 @@ export default function PageAutoPostRule() {
         </Button>
         <Text fw={600}>Auto Post Rule</Text>
       </Group>
+      {queueTotal > 0 && (
+        <Alert
+          icon={<MdOutlineInfo size={18} />}
+          color="yellow"
+          variant="light"
+          mb="sm"
+        >
+          Terdapat {queueTotal} antrian post berjalan
+        </Alert>
+      )}
       <Flex
         display="flex"
         direction={{ base: "column", md: "row" }}
@@ -181,6 +202,7 @@ export default function PageAutoPostRule() {
           <Table.Thead>
             <Table.Tr>
               <Table.Th>Nama</Table.Th>
+              <Table.Th>Trigger</Table.Th>
               <Table.Th>Target</Table.Th>
               <Table.Th>Save Mode</Table.Th>
               <Table.Th>Status</Table.Th>
@@ -194,6 +216,12 @@ export default function PageAutoPostRule() {
               rules.map((rule: typeDataAutoPostRule) => (
                 <Table.Tr key={rule.id}>
                   <Table.Td>{rule.name}</Table.Td>
+                  <Table.Td>
+                    <Badge variant="light" color="grape">
+                      {TRIGGER_TYPE_LABEL[rule.trigger_type] ??
+                        rule.trigger_type}
+                    </Badge>
+                  </Table.Td>
                   <Table.Td>
                     <Group gap={4}>
                       {rule.targets.map((t) => (
@@ -264,14 +292,14 @@ export default function PageAutoPostRule() {
               ))}
             {isSuccess && rules.length === 0 && (
               <Table.Tr>
-                <Table.Td colSpan={6} align="center" height={50}>
+                <Table.Td colSpan={7} align="center" height={50}>
                   Tidak ada data ditemukan
                 </Table.Td>
               </Table.Tr>
             )}
             {isLoading && (
               <Table.Tr>
-                <Table.Td colSpan={6} align="center" height={50}>
+                <Table.Td colSpan={7} align="center" height={50}>
                   Loading...
                 </Table.Td>
               </Table.Tr>

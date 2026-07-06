@@ -33,6 +33,13 @@ export type FindAllPostHistoryFilters = {
   platform?: AutoPostTarget;
 };
 
+export type UpdatePostHistoryInput = Partial<{
+  status: PostHistoryStatus;
+  postUrl: string | null;
+  errorMessage: string | null;
+  attempts: number;
+}>;
+
 @Injectable()
 export class PostHistoryService {
   constructor(
@@ -82,6 +89,10 @@ export class PostHistoryService {
       errorMessage: input.errorMessage ?? null,
     });
     return this.postHistoryRepo.save(row);
+  }
+
+  async update(id: string, patch: UpdatePostHistoryInput): Promise<void> {
+    await this.postHistoryRepo.update(id, patch);
   }
 
   async findAll(pagination: PaginationDto, filters: FindAllPostHistoryFilters) {

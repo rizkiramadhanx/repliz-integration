@@ -4,21 +4,27 @@ import {
   IsArray,
   IsBoolean,
   IsIn,
+  IsInt,
   IsNotEmpty,
   IsOptional,
   IsString,
   IsUUID,
+  Min,
   MaxLength,
   ValidateNested,
 } from 'class-validator';
 import {
   AUTO_POST_MEDIA_TYPES,
   AUTO_POST_TARGETS,
+  AUTO_POST_TRIGGER_TYPES,
   AutoPostMediaType,
   AutoPostTarget,
+  AutoPostTriggerType,
   FACEBOOK_POST_MODES,
   FacebookPostMode,
 } from '../entities/auto-post-rule.entity';
+
+export const MIN_INSTAGRAM_OBSERVER_INTERVAL_MINUTES = 60;
 
 export class CaptionReplacementDto {
   @IsString()
@@ -35,13 +41,42 @@ export class CreateAutoPostRuleDto {
   @MaxLength(255)
   name: string;
 
+  @IsIn(AUTO_POST_TRIGGER_TYPES)
+  triggerType: AutoPostTriggerType;
+
   @IsUUID()
-  discordAccountId: string;
+  @IsOptional()
+  discordAccountId?: string;
 
   @IsArray()
   @ArrayMinSize(1)
   @IsString({ each: true })
-  discordChannelIds: string[];
+  @IsOptional()
+  discordChannelIds?: string[];
+
+  @IsUUID()
+  @IsOptional()
+  instagramObserverAccountId?: string;
+
+  @IsArray()
+  @ArrayMinSize(1)
+  @IsString({ each: true })
+  @IsOptional()
+  instagramTargetUsernames?: string[];
+
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  excludeKeywords?: string[];
+
+  @IsBoolean()
+  @IsOptional()
+  includeOriginalCaption?: boolean;
+
+  @IsInt()
+  @Min(MIN_INSTAGRAM_OBSERVER_INTERVAL_MINUTES)
+  @IsOptional()
+  instagramCheckIntervalMinutes?: number;
 
   @IsArray()
   @ArrayMinSize(1)
@@ -112,6 +147,10 @@ export class UpdateAutoPostRuleDto {
   @MaxLength(255)
   name?: string;
 
+  @IsIn(AUTO_POST_TRIGGER_TYPES)
+  @IsOptional()
+  triggerType?: AutoPostTriggerType;
+
   @IsUUID()
   @IsOptional()
   discordAccountId?: string;
@@ -121,6 +160,30 @@ export class UpdateAutoPostRuleDto {
   @IsString({ each: true })
   @IsOptional()
   discordChannelIds?: string[];
+
+  @IsUUID()
+  @IsOptional()
+  instagramObserverAccountId?: string;
+
+  @IsArray()
+  @ArrayMinSize(1)
+  @IsString({ each: true })
+  @IsOptional()
+  instagramTargetUsernames?: string[];
+
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  excludeKeywords?: string[];
+
+  @IsBoolean()
+  @IsOptional()
+  includeOriginalCaption?: boolean;
+
+  @IsInt()
+  @Min(MIN_INSTAGRAM_OBSERVER_INTERVAL_MINUTES)
+  @IsOptional()
+  instagramCheckIntervalMinutes?: number;
 
   @IsArray()
   @ArrayMinSize(1)

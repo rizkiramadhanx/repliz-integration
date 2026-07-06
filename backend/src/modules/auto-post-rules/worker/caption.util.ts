@@ -20,3 +20,18 @@ export function applyCaptionRules(
     .filter(Boolean)
     .join('\n\n');
 }
+
+export function stripKeywords(
+  caption: string,
+  keywords: string[] | null | undefined,
+): string {
+  if (!keywords || keywords.length === 0) return caption;
+
+  let result = caption;
+  for (const keyword of keywords) {
+    if (!keyword.trim()) continue;
+    const escaped = escapeRegExp(keyword);
+    result = result.replace(new RegExp(escaped, 'gi'), '');
+  }
+  return result.replace(/[ \t]{2,}/g, ' ').trim();
+}

@@ -13,8 +13,8 @@ import {
   AutoPostRuleEntity,
 } from '../entities/auto-post-rule.entity';
 import { PublishTargetsService, PublishContext } from './publish-targets';
+import { PostHistoryMediaType } from '../../post-history/entities/post-history.entity';
 import { applyCaptionRules } from './caption.util';
-import { deleteFile, downloadToTemp } from './media.util';
 
 const VIDEO_EXTS = new Set(['.mp4', '.mov', '.mkv', '.webm']);
 const IMAGE_EXTS = new Set(['.jpg', '.jpeg', '.png', '.gif', '.webp']);
@@ -51,6 +51,7 @@ export class DiscordObserverManager implements OnModuleInit, OnModuleDestroy {
       .createQueryBuilder('rule')
       .select('DISTINCT rule.discordAccountId', 'discordAccountId')
       .where('rule.isActive = true')
+      .andWhere("rule.triggerType = 'discord_observer'")
       .getRawMany<{ discordAccountId: string }>();
 
     for (const { discordAccountId } of accountIds) {
@@ -72,7 +73,11 @@ export class DiscordObserverManager implements OnModuleInit, OnModuleDestroy {
     }
 
     const rules = await this.ruleRepo.find({
-      where: { discordAccountId: accountId, isActive: true },
+      where: {
+        discordAccountId: accountId,
+        isActive: true,
+        triggerType: 'discord_observer',
+      },
     });
 
     if (rules.length === 0) {
@@ -136,11 +141,15 @@ export class DiscordObserverManager implements OnModuleInit, OnModuleDestroy {
     message: Message,
   ): Promise<void> {
     const rules = await this.ruleRepo.find({
-      where: { discordAccountId, isActive: true },
+      where: {
+        discordAccountId,
+        isActive: true,
+        triggerType: 'discord_observer',
+      },
     });
 
     const matchingRules = rules.filter((rule) =>
-      rule.discordChannelIds.includes(message.channel.id),
+      (rule.discordChannelIds ?? []).includes(message.channel.id),
     );
     if (matchingRules.length === 0) return;
 
@@ -173,7 +182,7 @@ export class DiscordObserverManager implements OnModuleInit, OnModuleDestroy {
           {
             text: message.content,
             attachmentUrl: attachment.url,
-            attachmentName: attachment.name ?? 'media',
+            mediaType: mediaType === 'video' ? 'video' : 'photo',
           },
           sourceLabel,
         );
@@ -183,7 +192,11 @@ export class DiscordObserverManager implements OnModuleInit, OnModuleDestroy {
 
   private dispatch(
     rule: AutoPostRuleEntity,
-    payload: { text: string; attachmentUrl?: string; attachmentName?: string },
+    payload: {
+      text: string;
+      attachmentUrl?: string;
+      mediaType?: PostHistoryMediaType;
+    },
     sourceLabel?: string,
   ): void {
     if (!rule.saveMode) {
@@ -224,35 +237,38 @@ export class DiscordObserverManager implements OnModuleInit, OnModuleDestroy {
 
   private async processAndPublish(
     rule: AutoPostRuleEntity,
-    payload: { text: string; attachmentUrl?: string; attachmentName?: string },
+    payload: {
+      text: string;
+      attachmentUrl?: string;
+      mediaType?: PostHistoryMediaType;
+    },
     triggerSource: PublishContext['triggerSource'],
     sourceLabel?: string,
   ): Promise<void> {
     const text = applyCaptionRules(payload.text ?? '', rule);
 
-    let mediaPath: string | undefined;
-    try {
-      if (payload.attachmentUrl) {
-        mediaPath = await downloadToTemp(
-          payload.attachmentUrl,
-          payload.attachmentName ?? 'media',
-        );
-      }
-
-      await this.publishTargetsService.publishToTargets(
-        rule,
-        { text, mediaPath },
-        { ruleName: rule.name, triggerSource, sourceLabel },
-      );
-    } finally {
-      if (mediaPath) deleteFile(mediaPath);
-    }
+    await this.publishTargetsService.publishToTargets(
+      rule,
+      {
+        text,
+        mediaUrl: payload.attachmentUrl,
+        mediaType: payload.mediaType ?? 'text',
+      },
+      { ruleName: rule.name, triggerSource, sourceLabel },
+    );
   }
 
   async runRuleNow(ruleId: string): Promise<void> {
     const rule = await this.ruleRepo.findOne({ where: { id: ruleId } });
     if (!rule) {
       throw new Error(`Auto post rule ${ruleId} not found`);
+    }
+    if (
+      rule.triggerType !== 'discord_observer' ||
+      !rule.discordAccountId ||
+      !rule.discordChannelIds
+    ) {
+      throw new Error(`Rule ${ruleId} bukan tipe discord_observer`);
     }
 
     const client = this.clients.get(rule.discordAccountId);
@@ -295,7 +311,7 @@ export class DiscordObserverManager implements OnModuleInit, OnModuleDestroy {
           {
             text: lastMessage.content,
             attachmentUrl: attachment.url,
-            attachmentName: attachment.name ?? 'media',
+            mediaType: mediaType === 'video' ? 'video' : 'photo',
           },
           'discord_run_now',
           sourceLabel,
