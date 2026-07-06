@@ -18,7 +18,9 @@ import { ResponseMeta } from '../../common/type/response';
 import { AccountsService } from '../accounts/accounts.service';
 import { DiscordObserverManager } from './worker/discord-observer.manager';
 import { InstagramObserverManager } from './worker/instagram-observer.manager';
+import { TemplateObserverManager } from './worker/template-observer.manager';
 import { PostHistoryService } from '../post-history/post-history.service';
+import { isValidCronExpression } from './worker/cron.util';
 
 @Injectable()
 export class AutoPostRulesService {
@@ -28,6 +30,7 @@ export class AutoPostRulesService {
     private readonly accountsService: AccountsService,
     private readonly discordObserverManager: DiscordObserverManager,
     private readonly instagramObserverManager: InstagramObserverManager,
+    private readonly templateObserverManager: TemplateObserverManager,
     private readonly postHistoryService: PostHistoryService,
   ) {}
 
@@ -55,6 +58,10 @@ export class AutoPostRulesService {
       caption_prefix: rule.captionPrefix,
       caption_suffix: rule.captionSuffix,
       caption_replacements: rule.captionReplacements,
+      template_media_path: rule.templateMediaPath,
+      template_media_type: rule.templateMediaType,
+      template_caption: rule.templateCaption,
+      cron_expression: rule.cronExpression,
       save_mode: rule.saveMode,
       is_active: rule.isActive,
       created_at: rule.createdAt,
@@ -113,6 +120,38 @@ export class AutoPostRulesService {
         throw new BadRequestException(
           `instagramCheckIntervalMinutes minimal ${MIN_INSTAGRAM_OBSERVER_INTERVAL_MINUTES} menit untuk menghindari rate-limit/ban dari Instagram`,
         );
+      }
+    }
+
+    if (triggerType === 'template') {
+      const templateMediaPath =
+        dto.templateMediaPath ?? existing?.templateMediaPath;
+      if (!templateMediaPath) {
+        throw new BadRequestException(
+          'Media wajib diupload untuk trigger template',
+        );
+      }
+      const templateMediaType =
+        dto.templateMediaType ?? existing?.templateMediaType;
+      if (!templateMediaType) {
+        throw new BadRequestException(
+          'Tipe media (image/video) wajib diisi untuk trigger template',
+        );
+      }
+      const templateCaption = dto.templateCaption ?? existing?.templateCaption;
+      if (!templateCaption || !templateCaption.trim()) {
+        throw new BadRequestException(
+          'Caption wajib diisi untuk trigger template',
+        );
+      }
+      const cronExpression = dto.cronExpression ?? existing?.cronExpression;
+      if (!cronExpression) {
+        throw new BadRequestException(
+          'Jadwal (cron expression) wajib diisi untuk trigger template',
+        );
+      }
+      if (!isValidCronExpression(cronExpression)) {
+        throw new BadRequestException('Format cron expression tidak valid');
       }
     }
 
@@ -211,18 +250,27 @@ export class AutoPostRulesService {
   }
 
   private async reloadObserver(rule: AutoPostRuleEntity): Promise<void> {
-    if (rule.triggerType === 'discord_observer') {
-      if (rule.discordAccountId) {
-        await this.discordObserverManager.reloadForAccount(
-          rule.discordAccountId,
-        );
-      }
-    } else {
-      await this.instagramObserverManager.reloadForRule(rule.id);
+    switch (rule.triggerType) {
+      case 'discord_observer':
+        if (rule.discordAccountId) {
+          await this.discordObserverManager.reloadForAccount(
+            rule.discordAccountId,
+          );
+        }
+        break;
+      case 'instagram_observer':
+        await this.instagramObserverManager.reloadForRule(rule.id);
+        break;
+      case 'template':
+        await this.templateObserverManager.reloadForRule(rule.id);
+        break;
     }
   }
 
   async create(dto: CreateAutoPostRuleDto, userId: string, isAdmin: boolean) {
+    if (dto.triggerType === 'template' && dto.templateMediaType) {
+      dto.mediaTypes = [dto.templateMediaType];
+    }
     this.validateRule(dto);
     await this.assertAccessToReferencedAccounts(
       dto,
@@ -260,7 +308,11 @@ export class AutoPostRulesService {
           WHERE delegation.user_id = :userId
           AND delegation.account_id IN (
             rule.discord_account_id,
-            rule.instagram_observer_account_id
+            rule.instagram_observer_account_id,
+            rule.facebook_account_id,
+            rule.instagram_account_id,
+            rule.twitter_account_id,
+            rule.telegram_account_id
           )
         )`,
         { userId },
@@ -286,9 +338,23 @@ export class AutoPostRulesService {
   }
 
   private sourceAccountId(rule: AutoPostRuleEntity): string | null {
-    return rule.triggerType === 'discord_observer'
-      ? rule.discordAccountId
-      : rule.instagramObserverAccountId;
+    switch (rule.triggerType) {
+      case 'discord_observer':
+        return rule.discordAccountId;
+      case 'instagram_observer':
+        return rule.instagramObserverAccountId;
+      case 'template':
+        // Trigger template tidak punya akun sumber observer — fallback ke
+        // akun target publish pertama yang terisi, supaya non-admin dengan
+        // delegasi ke akun target itu tetap bisa akses rule ini.
+        return (
+          rule.facebookAccountId ??
+          rule.instagramAccountId ??
+          rule.twitterAccountId ??
+          rule.telegramAccountId ??
+          null
+        );
+    }
   }
 
   async getOneForUser(id: string, userId: string, isAdmin: boolean) {
@@ -325,6 +391,14 @@ export class AutoPostRulesService {
       }
     }
 
+    const effectiveTriggerType = dto.triggerType ?? rule.triggerType;
+    if (
+      effectiveTriggerType === 'template' &&
+      (dto.templateMediaType ?? rule.templateMediaType)
+    ) {
+      dto.mediaTypes = [dto.templateMediaType ?? rule.templateMediaType];
+    }
+
     this.validateRule(dto, rule);
     await this.assertAccessToReferencedAccounts(dto, rule, userId, isAdmin);
 
@@ -351,6 +425,12 @@ export class AutoPostRulesService {
     ) {
       this.instagramObserverManager.stopRule(saved.id);
     }
+    if (
+      previousTriggerType === 'template' &&
+      previousTriggerType !== saved.triggerType
+    ) {
+      this.templateObserverManager.stopRule(saved.id);
+    }
 
     await this.reloadObserver(saved);
 
@@ -372,10 +452,20 @@ export class AutoPostRulesService {
 
     await this.ruleRepo.delete(id);
 
-    if (rule.triggerType === 'discord_observer' && rule.discordAccountId) {
-      await this.discordObserverManager.reloadForAccount(rule.discordAccountId);
-    } else {
-      this.instagramObserverManager.stopRule(rule.id);
+    switch (rule.triggerType) {
+      case 'discord_observer':
+        if (rule.discordAccountId) {
+          await this.discordObserverManager.reloadForAccount(
+            rule.discordAccountId,
+          );
+        }
+        break;
+      case 'instagram_observer':
+        this.instagramObserverManager.stopRule(rule.id);
+        break;
+      case 'template':
+        this.templateObserverManager.stopRule(rule.id);
+        break;
     }
 
     return true;
@@ -407,9 +497,13 @@ export class AutoPostRulesService {
       );
     }
 
-    if (rule.triggerType === 'discord_observer') {
-      return this.discordObserverManager.runRuleNow(rule.id);
+    switch (rule.triggerType) {
+      case 'discord_observer':
+        return this.discordObserverManager.runRuleNow(rule.id);
+      case 'instagram_observer':
+        return this.instagramObserverManager.runRuleNow(rule.id);
+      case 'template':
+        return this.templateObserverManager.runRuleNow(rule.id);
     }
-    return this.instagramObserverManager.runRuleNow(rule.id);
   }
 }

@@ -19,6 +19,8 @@ export const POST_HISTORY_TRIGGER_SOURCES = [
   'discord_run_now',
   'instagram_observer',
   'instagram_run_now',
+  'template_scheduled',
+  'template_run_now',
 ] as const;
 export type PostHistoryTriggerSource =
   (typeof POST_HISTORY_TRIGGER_SOURCES)[number];

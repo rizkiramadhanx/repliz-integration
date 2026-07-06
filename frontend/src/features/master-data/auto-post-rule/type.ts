@@ -1,4 +1,7 @@
-export type typeAutoPostTriggerType = "discord_observer" | "instagram_observer";
+export type typeAutoPostTriggerType =
+  | "discord_observer"
+  | "instagram_observer"
+  | "template";
 
 export type typeAutoPostTarget =
   | "facebook"
@@ -7,6 +10,8 @@ export type typeAutoPostTarget =
   | "twitter";
 
 export type typeAutoPostMediaType = "image" | "video" | "text";
+
+export type typeAutoPostTemplateMediaType = "image" | "video";
 
 export type typeFacebookPostMode = "wall" | "group";
 
@@ -38,6 +43,10 @@ export type typeDataAutoPostRule = {
   caption_prefix: string | null;
   caption_suffix: string | null;
   caption_replacements: typeCaptionReplacement[] | null;
+  template_media_path: string | null;
+  template_media_type: typeAutoPostTemplateMediaType | null;
+  template_caption: string | null;
+  cron_expression: string | null;
   save_mode: boolean;
   is_active: boolean;
   created_at: string;
@@ -66,6 +75,10 @@ export type typeDataCreateAutoPostRulePayload = {
   captionPrefix?: string;
   captionSuffix?: string;
   captionReplacements?: typeCaptionReplacement[];
+  templateMediaPath?: string;
+  templateMediaType?: typeAutoPostTemplateMediaType;
+  templateCaption?: string;
+  cronExpression?: string;
   saveMode?: boolean;
   isActive?: boolean;
 };

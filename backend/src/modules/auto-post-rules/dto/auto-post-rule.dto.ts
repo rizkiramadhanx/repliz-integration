@@ -16,9 +16,11 @@ import {
 import {
   AUTO_POST_MEDIA_TYPES,
   AUTO_POST_TARGETS,
+  AUTO_POST_TEMPLATE_MEDIA_TYPES,
   AUTO_POST_TRIGGER_TYPES,
   AutoPostMediaType,
   AutoPostTarget,
+  AutoPostTemplateMediaType,
   AutoPostTriggerType,
   FACEBOOK_POST_MODES,
   FacebookPostMode,
@@ -132,6 +134,23 @@ export class CreateAutoPostRuleDto {
   @IsOptional()
   captionReplacements?: CaptionReplacementDto[];
 
+  @IsString()
+  @IsOptional()
+  templateMediaPath?: string;
+
+  @IsIn(AUTO_POST_TEMPLATE_MEDIA_TYPES)
+  @IsOptional()
+  templateMediaType?: AutoPostTemplateMediaType;
+
+  @IsString()
+  @IsOptional()
+  templateCaption?: string;
+
+  @IsString()
+  @IsOptional()
+  @MaxLength(100)
+  cronExpression?: string;
+
   @IsBoolean()
   @IsOptional()
   saveMode?: boolean;
@@ -240,6 +259,23 @@ export class UpdateAutoPostRuleDto {
   @Type(() => CaptionReplacementDto)
   @IsOptional()
   captionReplacements?: CaptionReplacementDto[];
+
+  @IsString()
+  @IsOptional()
+  templateMediaPath?: string;
+
+  @IsIn(AUTO_POST_TEMPLATE_MEDIA_TYPES)
+  @IsOptional()
+  templateMediaType?: AutoPostTemplateMediaType;
+
+  @IsString()
+  @IsOptional()
+  templateCaption?: string;
+
+  @IsString()
+  @IsOptional()
+  @MaxLength(100)
+  cronExpression?: string;
 
   @IsBoolean()
   @IsOptional()

@@ -10,6 +10,7 @@ import { PUBLISH_QUEUE_NAME } from './publish-queue.constants';
 export type PublishOptions = {
   text: string;
   mediaUrl?: string;
+  localMediaPath?: string;
   mediaType: PostHistoryMediaType;
 };
 
@@ -19,7 +20,9 @@ export type PublishContext = {
     | 'discord_observer'
     | 'discord_run_now'
     | 'instagram_observer'
-    | 'instagram_run_now';
+    | 'instagram_run_now'
+    | 'template_scheduled'
+    | 'template_run_now';
   sourceLabel?: string;
   sourceUrl?: string;
 };
@@ -42,6 +45,7 @@ export class PublishTargetsService {
     const base = {
       text: options.text,
       mediaUrl: options.mediaUrl,
+      localMediaPath: options.localMediaPath,
       mediaType: options.mediaType,
       ruleId: rule.id,
       ruleName: context.ruleName,

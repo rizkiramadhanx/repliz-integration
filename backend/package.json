@@ -47,6 +47,7 @@
     "discord.js-selfbot-v13": "^3.7.1",
     "express-session": "^1.18.0",
     "handlebars": "^4.7.8",
+    "multer": "^2.2.0",
     "node-telegram-bot-api": "^1.1.2",
     "nodemailer": "^6.9.15",
     "passport": "^0.7.0",

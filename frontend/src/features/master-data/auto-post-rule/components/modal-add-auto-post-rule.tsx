@@ -4,6 +4,8 @@ import CaptionFields from "@/features/master-data/auto-post-rule/components/capt
 import InstagramObserverSourceFields from "@/features/master-data/auto-post-rule/components/instagram-observer-source-fields";
 import MediaTypesFields from "@/features/master-data/auto-post-rule/components/media-types-fields";
 import TargetsFields from "@/features/master-data/auto-post-rule/components/targets-fields";
+import TemplateFields from "@/features/master-data/auto-post-rule/components/template-fields";
+import ScheduleFields from "@/features/master-data/auto-post-rule/components/schedule-fields";
 import useMutateAddAutoPostRule from "@/features/master-data/auto-post-rule/hooks/useMutateAddAutoPostRule";
 import type { typeAutoPostTriggerType } from "@/features/master-data/auto-post-rule/type";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -25,7 +27,7 @@ import {
 import { notifications } from "@mantine/notifications";
 import { useState } from "react";
 import { FaDiscord, FaInstagram } from "react-icons/fa6";
-import { MdOutlineClose } from "react-icons/md";
+import { MdOutlineClose, MdOutlineImage } from "react-icons/md";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
@@ -56,6 +58,10 @@ const schema = z.object({
   captionReplacements: z
     .array(z.object({ find: z.string(), replace: z.string() }))
     .optional(),
+  templateMediaPath: z.string().optional(),
+  templateMediaType: z.enum(["image", "video"]).optional(),
+  templateCaption: z.string().optional(),
+  cronExpression: z.string().optional(),
   saveMode: z.boolean(),
   isActive: z.boolean(),
 });
@@ -83,6 +89,10 @@ const DEFAULT_VALUES: AddAutoPostRuleSchema = {
   captionPrefix: "",
   captionSuffix: "",
   captionReplacements: [],
+  templateMediaPath: undefined,
+  templateMediaType: undefined,
+  templateCaption: "",
+  cronExpression: "0 9 * * *",
   saveMode: false,
   isActive: true,
 };
@@ -106,6 +116,13 @@ const TRIGGER_TYPE_OPTIONS: {
     description:
       "Pantau akun Instagram secara berkala, repost otomatis ke target",
     icon: <FaInstagram size={28} />,
+  },
+  {
+    value: "template",
+    title: "Template Terjadwal",
+    description:
+      "Upload media & caption sendiri, diposting berulang sesuai jadwal",
+    icon: <MdOutlineImage size={28} />,
   },
 ];
 
@@ -135,6 +152,14 @@ export default function ModalAddAutoPostRule({
     defaultValues: DEFAULT_VALUES,
   });
 
+  // trigger "template" tidak memakai field targets/mediaTypes generic secara
+  // langsung dari UI (targets tetap dipakai untuk pilih platform tujuan,
+  // tapi mediaTypes digantikan templateMediaType) — supaya validasi Zod
+  // (min 1) tidak memblokir submit, isi placeholder saat berpindah ke tipe ini.
+  const ensureTemplateDefaults = () => {
+    setValue("mediaTypes", ["image"], { shouldValidate: true });
+  };
+
   const { data: accountData } = useGetAllAccount({ page: 1, limit: 100 });
   const discordAccounts: typeDataAccount[] = (
     accountData?.data?.data ?? []
@@ -157,6 +182,9 @@ export default function ModalAddAutoPostRule({
   const handleChooseType = (type: typeAutoPostTriggerType) => {
     setTriggerType(type);
     setStep("form");
+    if (type === "template") {
+      ensureTemplateDefaults();
+    }
   };
 
   const handleBackToChooseType = () => {
@@ -164,6 +192,33 @@ export default function ModalAddAutoPostRule({
   };
 
   const onSubmit = (dataForm: AddAutoPostRuleSchema) => {
+    if (triggerType === "template") {
+      if (!dataForm.templateMediaPath || !dataForm.templateMediaType) {
+        notifications.show({
+          title: "Error",
+          message: "Upload media terlebih dahulu",
+          color: "red",
+        });
+        return;
+      }
+      if (!dataForm.templateCaption?.trim()) {
+        notifications.show({
+          title: "Error",
+          message: "Caption wajib diisi",
+          color: "red",
+        });
+        return;
+      }
+      if (!dataForm.cronExpression?.trim()) {
+        notifications.show({
+          title: "Error",
+          message: "Jadwal wajib diisi",
+          color: "red",
+        });
+        return;
+      }
+    }
+
     mutate(
       {
         name: dataForm.name,
@@ -220,12 +275,30 @@ export default function ModalAddAutoPostRule({
         telegramChatIds: dataForm.targets.includes("telegram")
           ? dataForm.telegramChatIds
           : undefined,
-        mediaTypes: dataForm.mediaTypes,
-        captionPrefix: dataForm.captionPrefix || undefined,
-        captionSuffix: dataForm.captionSuffix || undefined,
-        captionReplacements: dataForm.captionReplacements?.filter(
-          (r) => r.find,
-        ),
+        mediaTypes:
+          triggerType === "template"
+            ? [dataForm.templateMediaType!]
+            : dataForm.mediaTypes,
+        captionPrefix:
+          triggerType === "template"
+            ? undefined
+            : dataForm.captionPrefix || undefined,
+        captionSuffix:
+          triggerType === "template"
+            ? undefined
+            : dataForm.captionSuffix || undefined,
+        captionReplacements:
+          triggerType === "template"
+            ? undefined
+            : dataForm.captionReplacements?.filter((r) => r.find),
+        templateMediaPath:
+          triggerType === "template" ? dataForm.templateMediaPath : undefined,
+        templateMediaType:
+          triggerType === "template" ? dataForm.templateMediaType : undefined,
+        templateCaption:
+          triggerType === "template" ? dataForm.templateCaption : undefined,
+        cronExpression:
+          triggerType === "template" ? dataForm.cronExpression : undefined,
         saveMode: dataForm.saveMode,
         isActive: dataForm.isActive,
       },
@@ -320,7 +393,7 @@ export default function ModalAddAutoPostRule({
                 {...register("name")}
               />
 
-              {triggerType === "discord_observer" ? (
+              {triggerType === "discord_observer" && (
                 <>
                   <Divider label="Sumber Discord" labelPosition="left" />
                   <Select
@@ -351,7 +424,8 @@ export default function ModalAddAutoPostRule({
                     error={errors.discordChannelIds?.message}
                   />
                 </>
-              ) : (
+              )}
+              {triggerType === "instagram_observer" && (
                 <>
                   <Divider label="Sumber Instagram" labelPosition="left" />
                   <InstagramObserverSourceFields
@@ -390,6 +464,37 @@ export default function ModalAddAutoPostRule({
                         { shouldValidate: true },
                       );
                     }}
+                  />
+                </>
+              )}
+              {triggerType === "template" && (
+                <>
+                  <Divider label="Media & Jadwal" labelPosition="left" />
+                  <TemplateFields
+                    value={{
+                      templateMediaPath: formValue.templateMediaPath,
+                      templateMediaType: formValue.templateMediaType,
+                      templateCaption: formValue.templateCaption ?? "",
+                    }}
+                    onChange={(next) => {
+                      setValue("templateMediaPath", next.templateMediaPath, {
+                        shouldValidate: true,
+                      });
+                      setValue("templateMediaType", next.templateMediaType, {
+                        shouldValidate: true,
+                      });
+                      setValue("templateCaption", next.templateCaption, {
+                        shouldValidate: true,
+                      });
+                    }}
+                  />
+                  <ScheduleFields
+                    value={formValue.cronExpression ?? "0 9 * * *"}
+                    onChange={(val) =>
+                      setValue("cronExpression", val, {
+                        shouldValidate: true,
+                      })
+                    }
                   />
                 </>
               )}
@@ -437,30 +542,37 @@ export default function ModalAddAutoPostRule({
                 </Text>
               )}
 
-              <Divider label="Media & Caption" labelPosition="left" />
-              <MediaTypesFields
-                value={formValue.mediaTypes}
-                onChange={(next) =>
-                  setValue("mediaTypes", next, { shouldValidate: true })
-                }
-              />
-              {errors.mediaTypes?.message && (
-                <Text size="xs" c="red">
-                  {errors.mediaTypes.message}
-                </Text>
+              {triggerType !== "template" && (
+                <>
+                  <Divider label="Media & Caption" labelPosition="left" />
+                  <MediaTypesFields
+                    value={formValue.mediaTypes}
+                    onChange={(next) =>
+                      setValue("mediaTypes", next, { shouldValidate: true })
+                    }
+                  />
+                  {errors.mediaTypes?.message && (
+                    <Text size="xs" c="red">
+                      {errors.mediaTypes.message}
+                    </Text>
+                  )}
+                  <CaptionFields
+                    value={{
+                      captionPrefix: formValue.captionPrefix,
+                      captionSuffix: formValue.captionSuffix,
+                      captionReplacements: formValue.captionReplacements ?? [],
+                    }}
+                    onChange={(next) => {
+                      setValue("captionPrefix", next.captionPrefix);
+                      setValue("captionSuffix", next.captionSuffix);
+                      setValue(
+                        "captionReplacements",
+                        next.captionReplacements,
+                      );
+                    }}
+                  />
+                </>
               )}
-              <CaptionFields
-                value={{
-                  captionPrefix: formValue.captionPrefix,
-                  captionSuffix: formValue.captionSuffix,
-                  captionReplacements: formValue.captionReplacements ?? [],
-                }}
-                onChange={(next) => {
-                  setValue("captionPrefix", next.captionPrefix);
-                  setValue("captionSuffix", next.captionSuffix);
-                  setValue("captionReplacements", next.captionReplacements);
-                }}
-              />
 
               {triggerType === "discord_observer" && (
                 <>

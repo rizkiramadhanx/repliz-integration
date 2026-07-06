@@ -10,8 +10,13 @@ import { Expose } from 'class-transformer';
 export const AUTO_POST_TRIGGER_TYPES = [
   'discord_observer',
   'instagram_observer',
+  'template',
 ] as const;
 export type AutoPostTriggerType = (typeof AUTO_POST_TRIGGER_TYPES)[number];
+
+export const AUTO_POST_TEMPLATE_MEDIA_TYPES = ['image', 'video'] as const;
+export type AutoPostTemplateMediaType =
+  (typeof AUTO_POST_TEMPLATE_MEDIA_TYPES)[number];
 
 export const AUTO_POST_TARGETS = [
   'facebook',
@@ -89,6 +94,27 @@ export class AutoPostRuleEntity {
   })
   @Expose({ name: 'instagram_check_interval_minutes' })
   instagramCheckIntervalMinutes: number | null;
+
+  @Column({ name: 'template_media_path', type: 'text', nullable: true })
+  @Expose({ name: 'template_media_path' })
+  templateMediaPath: string | null;
+
+  @Column({ name: 'template_media_type', type: 'varchar', nullable: true })
+  @Expose({ name: 'template_media_type' })
+  templateMediaType: AutoPostTemplateMediaType | null;
+
+  @Column({ name: 'template_caption', type: 'text', nullable: true })
+  @Expose({ name: 'template_caption' })
+  templateCaption: string | null;
+
+  @Column({
+    name: 'cron_expression',
+    type: 'varchar',
+    length: 100,
+    nullable: true,
+  })
+  @Expose({ name: 'cron_expression' })
+  cronExpression: string | null;
 
   @Column({ type: 'jsonb' })
   @Expose({ name: 'targets' })

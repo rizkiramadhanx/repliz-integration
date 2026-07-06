@@ -21,6 +21,7 @@ export interface PublishJobData {
   targetRef?: string;
   text: string;
   mediaUrl?: string;
+  localMediaPath?: string;
   mediaType: PostHistoryMediaType;
   ruleId: string;
   ruleName: string;
@@ -97,8 +98,11 @@ export class PublishQueueProcessor extends WorkerHost {
     }
 
     let mediaPath: string | undefined;
+    let isTempMedia = false;
     try {
-      if (job.data.mediaUrl) {
+      if (job.data.localMediaPath) {
+        mediaPath = job.data.localMediaPath;
+      } else if (job.data.mediaUrl) {
         const isInstagramCdn = job.data.triggerSource.startsWith('instagram');
         mediaPath = await downloadToTemp(
           job.data.mediaUrl,
@@ -107,6 +111,7 @@ export class PublishQueueProcessor extends WorkerHost {
             ? { Referer: job.data.sourceUrl }
             : undefined,
         );
+        isTempMedia = true;
       }
 
       const options = { text: job.data.text, mediaPath };
@@ -151,7 +156,7 @@ export class PublishQueueProcessor extends WorkerHost {
 
       return { postUrl };
     } finally {
-      if (mediaPath) deleteFile(mediaPath);
+      if (mediaPath && isTempMedia) deleteFile(mediaPath);
     }
   }
 

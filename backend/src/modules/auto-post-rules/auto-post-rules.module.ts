@@ -8,6 +8,7 @@ import { AutoPostRulesService } from './auto-post-rules.service';
 import { AutoPostRulesController } from './auto-post-rules.controller';
 import { DiscordObserverManager } from './worker/discord-observer.manager';
 import { InstagramObserverManager } from './worker/instagram-observer.manager';
+import { TemplateObserverManager } from './worker/template-observer.manager';
 import { PublishTargetsService } from './worker/publish-targets';
 import { PublishQueueProcessor } from './worker/publish-queue.processor';
 import { PUBLISH_QUEUE_NAME } from './worker/publish-queue.constants';
@@ -32,6 +33,7 @@ import { PostHistoryModule } from '../post-history/post-history.module';
     AutoPostRulesService,
     DiscordObserverManager,
     InstagramObserverManager,
+    TemplateObserverManager,
     PublishTargetsService,
     PublishQueueProcessor,
   ],

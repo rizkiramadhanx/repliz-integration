@@ -10,8 +10,11 @@ import {
   Post,
   Query,
   Res,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { Response } from 'express';
 import { AutoPostRulesService } from './auto-post-rules.service';
 import {
@@ -29,6 +32,11 @@ import {
 import { CurrentUser, CurrentUserType } from '../../security/user.decorator';
 import { LogsService } from '../logs/logs.service';
 import { PublishTargetsService } from './worker/publish-targets';
+import {
+  templateMediaFileFilter,
+  templateMediaStorage,
+  TEMPLATE_MEDIA_MAX_SIZE_BYTES,
+} from './worker/template-upload.util';
 
 function isAdmin(user: CurrentUserType): boolean {
   return user?.role?.name === 'Admin';
@@ -75,6 +83,33 @@ export class AutoPostRulesController {
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
+  }
+
+  @Post('upload-template-media')
+  @Permissions('auto-post-rule:create')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: templateMediaStorage,
+      limits: { fileSize: TEMPLATE_MEDIA_MAX_SIZE_BYTES },
+      fileFilter: templateMediaFileFilter,
+    }),
+  )
+  async uploadTemplateMedia(
+    @UploadedFile() file: Express.Multer.File,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    if (!file) {
+      res.status(HttpStatus.BAD_REQUEST);
+      return createErrorResponse(
+        'File tidak valid. Hanya menerima gambar (jpg/png/webp) atau video (mp4/mov) maksimal 50MB',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+    res.status(HttpStatus.CREATED);
+    return createSuccessResponse('Media berhasil diupload', {
+      path: `template-media/${file.filename}`,
+      mediaType: file.mimetype.startsWith('video/') ? 'video' : 'image',
+    });
   }
 
   @Get()
