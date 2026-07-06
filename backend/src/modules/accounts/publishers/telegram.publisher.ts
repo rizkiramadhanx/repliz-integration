@@ -30,13 +30,13 @@ function buildPostUrl(
 export class TelegramPublisher {
   async publish(
     account: AccountEntity,
-    options: { text: string; mediaPath?: string },
+    options: { text: string; mediaPath?: string; chatId?: string },
   ): Promise<TelegramPublishResult> {
     const botToken = account.credentials.botToken as string | undefined;
-    const chatId = account.credentials.chatId as string | number | undefined;
-    const chatUsername = account.credentials.chatUsername as
-      | string
-      | undefined;
+    const chatId =
+      options.chatId ??
+      (account.credentials.chatId as string | number | undefined);
+    const chatUsername = account.credentials.chatUsername as string | undefined;
 
     if (!botToken) {
       throw new Error(
@@ -80,10 +80,9 @@ export class TelegramPublisher {
     }
 
     try {
-      const res = await fetch(
-        `https://api.telegram.org/bot${botToken}/getMe`,
-        { signal: AbortSignal.timeout(10000) },
-      );
+      const res = await fetch(`https://api.telegram.org/bot${botToken}/getMe`, {
+        signal: AbortSignal.timeout(10000),
+      });
       const body = (await res.json()) as {
         ok: boolean;
         description?: string;

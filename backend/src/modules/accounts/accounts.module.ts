@@ -6,6 +6,9 @@ import { AccountsService } from './accounts.service';
 import { AccountsController } from './accounts.controller';
 import { LogsModule } from '../logs/logs.module';
 import { TelegramPublisher } from './publishers/telegram.publisher';
+import { FacebookPublisher } from './publishers/facebook.publisher';
+import { InstagramPublisher } from './publishers/instagram.publisher';
+import { TwitterPublisher } from './publishers/twitter.publisher';
 import { ConnectionCheckService } from './connection-check/connection-check.service';
 import { DiscordChecker } from './connection-check/discord.checker';
 import { CookieSessionChecker } from './connection-check/cookie-session.checker';
@@ -19,10 +22,19 @@ import { CookieSessionChecker } from './connection-check/cookie-session.checker'
   providers: [
     AccountsService,
     TelegramPublisher,
+    FacebookPublisher,
+    InstagramPublisher,
+    TwitterPublisher,
     ConnectionCheckService,
     DiscordChecker,
     CookieSessionChecker,
   ],
-  exports: [AccountsService],
+  exports: [
+    AccountsService,
+    TelegramPublisher,
+    FacebookPublisher,
+    InstagramPublisher,
+    TwitterPublisher,
+  ],
 })
 export class AccountsModule {}

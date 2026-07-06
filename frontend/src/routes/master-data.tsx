@@ -3,6 +3,7 @@ import ProtectedLayout from "@/components/layout/protected-layout";
 import PageRole from "@/features/master-data/role/page-role";
 import PageUser from "@/features/master-data/user/page-user";
 import PageAccount from "@/features/master-data/account/page-account";
+import PageAutoPostRule from "@/features/master-data/auto-post-rule/page-auto-post-rule";
 
 import { RouteObject } from "react-router";
 
@@ -30,6 +31,10 @@ const MasterDataRoutes: RouteObject[] = [
       {
         path: "account",
         element: <PageAccount />,
+      },
+      {
+        path: "auto-post-rule",
+        element: <PageAutoPostRule />,
       },
     ],
   },

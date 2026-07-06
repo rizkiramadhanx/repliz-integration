@@ -22,6 +22,20 @@ const ACTION_ROLES = [
       'account:publish',
     ],
   },
+  {
+    name: 'auto-post-rule',
+    actions: [
+      'auto-post-rule:create',
+      'auto-post-rule:read',
+      'auto-post-rule:update',
+      'auto-post-rule:delete',
+      'auto-post-rule:run',
+    ],
+  },
+  {
+    name: 'post-history',
+    actions: ['post-history:read'],
+  },
 ];
 
 export default ACTION_ROLES;
