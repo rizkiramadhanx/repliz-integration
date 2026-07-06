@@ -10,14 +10,8 @@ export const ROUTES = {
     Role: {
       View: "/master-data/role",
     },
-    Item: {
-      View: "/master-data/item",
-    },
-    Category: {
-      View: "/master-data/category",
-    },
-    Brand: {
-      View: "/master-data/brand",
+    Account: {
+      View: "/master-data/account",
     },
   },
   Log: {

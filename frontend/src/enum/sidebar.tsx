@@ -4,9 +4,8 @@ import { ReactNode } from "react";
 import { BiUser } from "react-icons/bi";
 import { FaDatabase } from "react-icons/fa";
 import { HiShieldCheck } from "react-icons/hi";
-import { MdHistory, MdCategory } from "react-icons/md";
-import { GiGoldBar } from "react-icons/gi";
-import { BsBuildingsFill } from "react-icons/bs";
+import { MdHistory } from "react-icons/md";
+import { FaUserShield } from "react-icons/fa6";
 
 export type SidebarMenuChild = {
   title: string;
@@ -42,22 +41,10 @@ const SidebarMenu: SidebarMenuItem[] = [
         modules: [MODULE_LIST.MasterData.Role.Read],
       },
       {
-        title: "Item",
-        icon: <GiGoldBar />,
-        path: ROUTES.MasterData.Item.View,
-        modules: [MODULE_LIST.MasterData.Item.Read],
-      },
-      {
-        title: "Kategori",
-        icon: <MdCategory />,
-        path: ROUTES.MasterData.Category.View,
-        modules: [MODULE_LIST.MasterData.Category.Read],
-      },
-      {
-        title: "Brand",
-        icon: <BsBuildingsFill />,
-        path: ROUTES.MasterData.Brand.View,
-        modules: [MODULE_LIST.MasterData.Brand.Read],
+        title: "Account",
+        icon: <FaUserShield />,
+        path: ROUTES.MasterData.Account.View,
+        modules: [MODULE_LIST.MasterData.Account.Read],
       },
     ],
   },

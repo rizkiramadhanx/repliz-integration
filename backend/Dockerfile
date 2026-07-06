@@ -10,23 +10,21 @@ COPY . .
 RUN npm run build
 
 # Production stage
-FROM node:22-alpine AS production
+FROM mcr.microsoft.com/playwright:v1.61.1-noble AS production
 
 WORKDIR /usr/src/app
 
 ENV NODE_ENV=production
 ENV PORT=4000
 
-RUN apk add --no-cache su-exec
+RUN apt-get update && apt-get install -y --no-install-recommends gosu && rm -rf /var/lib/apt/lists/*
 
 COPY package*.json ./
-RUN npm ci --omit=dev
+RUN npm ci --omit=dev --legacy-peer-deps && npx playwright install --with-deps chromium
 
 COPY --from=builder /usr/src/app/dist ./dist
 
-RUN addgroup -g 1001 -S nodejs && adduser -S nestjs -u 1001 -G nodejs
-
-# Entrypoint: fix volume permissions then run as nestjs
+# Entrypoint: fix volume permissions then run as pwuser (bawaan image Playwright)
 COPY docker-entrypoint.sh /usr/src/app/docker-entrypoint.sh
 RUN chmod +x /usr/src/app/docker-entrypoint.sh
 ENTRYPOINT ["/usr/src/app/docker-entrypoint.sh"]

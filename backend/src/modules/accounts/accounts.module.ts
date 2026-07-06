@@ -1,0 +1,28 @@
+import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { AccountEntity } from './entities/account.entity';
+import { AccountDelegationEntity } from './entities/account-delegation.entity';
+import { AccountsService } from './accounts.service';
+import { AccountsController } from './accounts.controller';
+import { LogsModule } from '../logs/logs.module';
+import { TelegramPublisher } from './publishers/telegram.publisher';
+import { ConnectionCheckService } from './connection-check/connection-check.service';
+import { DiscordChecker } from './connection-check/discord.checker';
+import { CookieSessionChecker } from './connection-check/cookie-session.checker';
+
+@Module({
+  imports: [
+    TypeOrmModule.forFeature([AccountEntity, AccountDelegationEntity]),
+    LogsModule,
+  ],
+  controllers: [AccountsController],
+  providers: [
+    AccountsService,
+    TelegramPublisher,
+    ConnectionCheckService,
+    DiscordChecker,
+    CookieSessionChecker,
+  ],
+  exports: [AccountsService],
+})
+export class AccountsModule {}

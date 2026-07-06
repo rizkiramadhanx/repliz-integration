@@ -19,24 +19,15 @@ const ROLES: { name: string; actions: string[] }[] = [
     actions: [
       'user:read',
       'log:read',
-      'item:create',
-      'item:read',
-      'item:update',
-      'item:delete',
-      'category:create',
-      'category:read',
-      'category:update',
-      'category:delete',
-      'brand:create',
-      'brand:read',
-      'brand:update',
-      'brand:delete',
+      'account:create',
+      'account:read',
+      'account:update',
     ],
   },
   {
-    // Operator — hanya lihat data master (dipakai untuk operasional antrian)
+    // Operator — akses terbatas, akun sosmed diakses lewat delegasi
     name: 'Operator',
-    actions: ['item:read', 'category:read', 'brand:read'],
+    actions: ['account:read'],
   },
 ];
 

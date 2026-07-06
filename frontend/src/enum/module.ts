@@ -12,23 +12,11 @@ export const MODULE_LIST = {
       Update: "user:update",
       Delete: "user:delete",
     },
-    Item: {
-      Create: "item:create",
-      Read: "item:read",
-      Update: "item:update",
-      Delete: "item:delete",
-    },
-    Category: {
-      Create: "category:create",
-      Read: "category:read",
-      Update: "category:update",
-      Delete: "category:delete",
-    },
-    Brand: {
-      Create: "brand:create",
-      Read: "brand:read",
-      Update: "brand:update",
-      Delete: "brand:delete",
+    Account: {
+      Create: "account:create",
+      Read: "account:read",
+      Update: "account:update",
+      Delete: "account:delete",
     },
   },
   Log: {

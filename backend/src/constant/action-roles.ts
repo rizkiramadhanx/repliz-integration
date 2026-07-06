@@ -13,21 +13,14 @@ const ACTION_ROLES = [
     actions: ['log:read'],
   },
   {
-    name: 'item',
-    actions: ['item:create', 'item:read', 'item:update', 'item:delete'],
-  },
-  {
-    name: 'category',
+    name: 'account',
     actions: [
-      'category:create',
-      'category:read',
-      'category:update',
-      'category:delete',
+      'account:create',
+      'account:read',
+      'account:update',
+      'account:delete',
+      'account:publish',
     ],
-  },
-  {
-    name: 'brand',
-    actions: ['brand:create', 'brand:read', 'brand:update', 'brand:delete'],
   },
 ];
 

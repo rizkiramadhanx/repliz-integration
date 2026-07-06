@@ -3,9 +3,8 @@ import { config } from 'dotenv';
 import { UserEntity } from '../modules/users/entities/user.entity';
 import { RoleEntity } from '../modules/roles/entities/role.entity';
 import { LogEntity } from '../modules/logs/entities/log.entity';
-import { ItemEntity } from '../modules/items/entities/item.entity';
-import { CategoryEntity } from '../modules/items/entities/category.entity';
-import { BrandEntity } from '../modules/items/entities/brand.entity';
+import { AccountEntity } from '../modules/accounts/entities/account.entity';
+import { AccountDelegationEntity } from '../modules/accounts/entities/account-delegation.entity';
 
 config();
 
@@ -20,9 +19,8 @@ export default new DataSource({
     UserEntity,
     RoleEntity,
     LogEntity,
-    ItemEntity,
-    CategoryEntity,
-    BrandEntity,
+    AccountEntity,
+    AccountDelegationEntity,
   ],
   migrations: ['src/migration/*.ts'],
   synchronize: false,

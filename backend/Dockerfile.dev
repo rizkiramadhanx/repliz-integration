@@ -1,9 +1,9 @@
-FROM node:22-alpine
+FROM mcr.microsoft.com/playwright:v1.61.1-noble
 
 WORKDIR /usr/src/app
 
 COPY package*.json ./
-RUN npm ci
+RUN npm ci --legacy-peer-deps && npx playwright install --with-deps chromium
 
 COPY . .
 

@@ -9,7 +9,7 @@ import { RolesModule } from './modules/roles/roles.module';
 import { APP_INTERCEPTOR } from '@nestjs/core';
 import { MailModule } from './modules/mailer/mailer.module';
 import { LogsModule } from './modules/logs/logs.module';
-import { ItemsModule } from './modules/items/items.module';
+import { AccountsModule } from './modules/accounts/accounts.module';
 
 @Module({
   imports: [
@@ -19,7 +19,7 @@ import { ItemsModule } from './modules/items/items.module';
     UsersModule,
     MailModule,
     RolesModule,
-    ItemsModule,
+    AccountsModule,
   ],
   controllers: [AppController],
   providers: [
