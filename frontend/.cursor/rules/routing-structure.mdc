@@ -1,0 +1,66 @@
+# Routing Structure
+
+## Main Router Configuration
+
+The main routing is configured in [src/routes/index.tsx](mdc:src/routes/index.tsx) using React Router 7.
+
+## Route Organization
+
+Routes are organized by feature and imported from separate files:
+
+- **Authentication Routes**: [src/routes/authentication.tsx](mdc:src/routes/authentication.tsx)
+- **Master Data Routes**: [src/routes/master-data.tsx](mdc:src/routes/master-data.tsx)
+- **Stock Opname Routes**: [src/routes/stock-opname.tsx](mdc:src/routes/stock-opname.tsx)
+- **Purchasing Routes**: [src/routes/purchasing.tsx](mdc:src/routes/purchasing.tsx)
+- **Activity Log Routes**: [src/routes/activity-log.tsx](mdc:src/routes/activity-log.tsx)
+
+## Route Structure Pattern
+
+Each feature route follows this pattern:
+
+```typescript
+const [Feature]Routes: RouteObject[] = [
+  {
+    path: "/[feature]",
+    element: (
+      <ProtectedLayout>
+        <DashboardLayout />
+      </ProtectedLayout>
+    ),
+    children: [
+      {
+        index: true,
+        element: <Page[Feature] />,
+      },
+      {
+        path: "[sub-feature]",
+        element: <Page[SubFeature] />,
+      },
+    ],
+  },
+];
+```
+
+## Layout Components
+
+- **ProtectedLayout**: Wraps authenticated routes
+- **DashboardLayout**: Provides sidebar and top navigation
+- **GuestLayout**: For authentication pages (login/register)
+
+## Dynamic Routes
+
+- **ID-based Routes**: Use `:id` parameter for detail views
+- **Nested Routes**: Organize related functionality under parent routes
+- **Route Guards**: Implement authentication checks in ProtectedLayout
+
+## Navigation
+
+- **Sidebar Navigation**: Configured in [src/components/layout/Sidebar.tsx](mdc:src/components/layout/Sidebar.tsx)
+- **Breadcrumbs**: Use for deep navigation context
+- **Back Navigation**: Implement back button functionality using `router(-1)`
+- **Route Constants**: Define routes in [src/enum/routes.ts](mdc:src/enum/routes.ts)
+  description:
+  globs:
+  alwaysApply: true
+
+---

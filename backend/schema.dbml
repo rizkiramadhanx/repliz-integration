@@ -1,0 +1,83 @@
+// Schema DBML - referensi tabel (semua punya created_at, updated_at)
+
+Table roles {
+  id int [pk, increment]
+  name varchar
+  actions string[]
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table users {
+  id int [pk, increment]
+  email varchar [unique]
+  password varchar
+  role_id int [ref: > roles.id]
+  event_id int [ref: > events.id, note: 'nullable']
+  name varchar
+  is_confirmed boolean
+  picture varchar
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table events {
+  id int [pk, increment]
+  name string
+  date date
+  address string
+  address_url string
+  image_background string
+  description string
+  brochure string
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table event_category {
+  id int [pk, increment]
+  event_id int [ref: > events.id]
+  name string
+  price int
+  max_participant int
+  description string
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table participant {
+  id int [pk, increment]
+  event_category_id int [ref: > event_category.id]
+  name string
+  bird_name string
+  address string
+  position int
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table registration_event {
+  id int [pk, increment]
+  event_category_id int [ref: > event_category.id]
+  name string
+  phone varchar
+  expired_at timestamp
+  time_reregistration time
+  status string
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table history_registration {
+  id int [pk, increment]
+  event_category_id int
+  event_name string
+  event_category_name string
+  price int
+  created_at timestamp
+  updated_at timestamp
+}
+
+Ref: "events"."id" < "event_category"."event_id"
+Ref: "event_category"."id" < "registration_event"."event_category_id"
+Ref: "event_category"."id" < "participant"."event_category_id"

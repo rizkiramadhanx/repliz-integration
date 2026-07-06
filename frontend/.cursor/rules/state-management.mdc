@@ -1,0 +1,52 @@
+# State Management Patterns
+
+## Zustand Stores
+The project uses Zustand for client-side state management. Store files are located in [src/store/](mdc:src/store/).
+
+### Store Structure
+- **User Store**: Authentication and user data (see [src/store/user.ts](mdc:src/store/user.ts))
+- **Navigation Store**: Sidebar and navigation state
+- **Dashboard Store**: Feature-specific state (e.g., stock opname filters)
+
+### Store Patterns
+- **Interface Definition**: Define state interface with actions
+- **Persistence**: Use Zustand persist middleware for localStorage
+- **Type Safety**: Full TypeScript support with proper typing
+- **Actions**: Define actions as functions that update state
+
+### Store Usage
+```typescript
+// Access store state
+const { user, setUser } = useUserStore();
+
+// Update state
+setUser(userData);
+```
+
+## React Query (Server State)
+- **Query Hooks**: Use for data fetching with caching
+- **Mutation Hooks**: Use for data modifications
+- **Query Keys**: Consistent naming for cache management
+- **Error Handling**: Proper error states and user feedback
+
+## Form State
+- **React Hook Form**: Use for form state management
+- **Zod Validation**: Schema-based validation with `zodResolver`
+- **Form State**: Access form state via `formState` object
+- **Field Registration**: Use `register` function for form fields
+
+## Local State
+- **useState**: Use for component-specific state
+- **useEffect**: Use for side effects and lifecycle management
+- **Custom Hooks**: Extract reusable state logic into custom hooks
+- **State Lifting**: Lift state up when needed by multiple components
+
+## State Organization
+- **Global State**: User authentication, navigation, app-wide settings
+- **Feature State**: Feature-specific data and filters
+- **Component State**: UI state, form data, local interactions
+- **Server State**: API data, caching, synchronization
+description:
+globs:
+alwaysApply: true
+---

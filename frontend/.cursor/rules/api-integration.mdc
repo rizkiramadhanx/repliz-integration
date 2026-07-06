@@ -1,0 +1,39 @@
+# API Integration Patterns
+
+## HTTP Client Configuration
+The project uses Axios with two instances configured in [src/libs/axios.ts](mdc:src/libs/axios.ts):
+- **`axiosERPInstance`**: For ERP API calls (base URL from `VITE_PUBLIC_BACKEND_ERP_URL`)
+- **`axiosAuthInstance`**: For authentication API calls (base URL from `VITE_PUBLIC_BACKEND_AUTH_URL`)
+
+## Authentication & Interceptors
+- **Token Management**: Automatic token injection from localStorage using `store2`
+- **401 Handling**: Automatic token removal and logout on 401 responses
+- **Request Interceptors**: Add Authorization header with Bearer token
+- **Response Interceptors**: Handle authentication errors globally
+
+## React Query Integration
+- **Query Client**: Configured in [src/libs/react-query.tsx](mdc:src/libs/react-query.tsx)
+- **Default Options**: `refetchOnWindowFocus: false` for better UX
+- **Query Keys**: Use consistent naming like `["role", keyword, page, limit, status]`
+- **Error Handling**: Use `AxiosError` type for proper error typing
+
+## API Response Structure
+- **Standard Response**: Use `typeDataCommonResponse<T>` wrapper from [src/types/fetching.ts](mdc:src/types/fetching.ts)
+- **Metadata**: Include pagination info (total, page, limit)
+- **Data**: Wrapped in `data.data` structure
+- **Error Handling**: Consistent error response format
+
+## Hook Patterns
+- **Query Hooks**: Use `useQuery` with proper typing and error handling
+- **Mutation Hooks**: Use `useMutation` with success/error callbacks
+- **Query Invalidation**: Invalidate related queries after successful mutations
+- **Optimistic Updates**: Implement optimistic updates for better UX
+
+## Environment Configuration
+- **Backend URLs**: Configure via environment variables
+- **Development Mode**: Show development indicator when `VITE_PUBLIC_NODE_ENV === "development"`
+- **API Endpoints**: Use RESTful endpoints (e.g., `/roles`, `/users`, `/stock-opname`)
+description:
+globs:
+alwaysApply: true
+---

@@ -1,0 +1,77 @@
+# Development: semua service (postgres + backend + frontend) jalan di container,
+# dengan volume mount source code untuk hot-reload. Tidak butuh Node/npm terinstall
+# di host — jalankan langsung via: docker compose -f docker-compose.dev.yml up --build
+#
+# Tidak butuh .env — semua value punya default lewat ${VAR:-default} di bawah.
+# Kalau ada .env di root (dipakai bareng docker-compose.yml production), variabel
+# yang sama otomatis dipakai untuk override default dev ini juga.
+#
+# node_modules sengaja pakai anonymous volume terpisah dari mount source code,
+# supaya node_modules hasil `npm ci` di dalam image TIDAK tertimpa oleh
+# node_modules di host (yang mungkin tidak ada / beda OS-arch).
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USERNAME:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${DB_NAME:-ternak_sosmed}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-postgres}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    restart: unless-stopped
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USERNAME: ${DB_USERNAME:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      DB_NAME: ${DB_NAME:-ternak_sosmed}
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: 4000
+      FRONT_END_URL: http://localhost:5173
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-not-for-production}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-1h}
+      JWT_SECRET_REFRESH: ${JWT_SECRET_REFRESH:-dev-secret-refresh-not-for-production}
+      JWT_EXPIRES_IN_REFRESH: ${JWT_EXPIRES_IN_REFRESH:-7d}
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./backend:/usr/src/app
+      - backend_node_modules:/usr/src/app/node_modules
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    restart: unless-stopped
+    environment:
+      VITE_PUBLIC_BACKEND_AUTH_URL: http://localhost:4000
+      VITE_PUBLIC_NODE_ENV: ${NODE_ENV:-development}
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - frontend_node_modules:/app/node_modules
+    depends_on:
+      - backend
+
+volumes:
+  postgres_dev_data:
+  backend_node_modules:
+  frontend_node_modules:

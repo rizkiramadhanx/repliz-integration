@@ -1,0 +1,77 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USERNAME:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${DB_NAME:-ternak_sosmed}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-postgres}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ternak-sosmed-network
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USERNAME: ${DB_USERNAME:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      DB_NAME: ${DB_NAME:-ternak_sosmed}
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: 4000
+      FRONT_END_URL: https://${FRONTEND_DOMAIN}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-1h}
+      JWT_SECRET_REFRESH: ${JWT_SECRET_REFRESH:?JWT_SECRET_REFRESH is required}
+      JWT_EXPIRES_IN_REFRESH: ${JWT_EXPIRES_IN_REFRESH:-7d}
+      MAIL_HOST: ${MAIL_HOST:-}
+      MAIL_PORT: ${MAIL_PORT:-}
+      MAIL_USER: ${MAIL_USER:-}
+      MAIL_PASS: ${MAIL_PASS:-}
+      MAIL_FROM: ${MAIL_FROM:-}
+    volumes:
+      - app_uploads:/usr/src/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - ternak-sosmed-network
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.ternak-sosmed-backend.rule=Host(`${BACKEND_DOMAIN}`)
+      - traefik.http.routers.ternak-sosmed-backend.entrypoints=websecure
+      - traefik.http.routers.ternak-sosmed-backend.tls.certResolver=letsencrypt
+      - traefik.http.services.ternak-sosmed-backend.loadbalancer.server.port=4000
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_PUBLIC_BACKEND_AUTH_URL: https://${BACKEND_DOMAIN}
+    restart: unless-stopped
+    depends_on:
+      - backend
+    networks:
+      - ternak-sosmed-network
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.ternak-sosmed-frontend.rule=Host(`${FRONTEND_DOMAIN}`)
+      - traefik.http.routers.ternak-sosmed-frontend.entrypoints=websecure
+      - traefik.http.routers.ternak-sosmed-frontend.tls.certResolver=letsencrypt
+      - traefik.http.services.ternak-sosmed-frontend.loadbalancer.server.port=80
+
+volumes:
+  postgres_data:
+  app_uploads:
+
+networks:
+  ternak-sosmed-network:
+    external: true

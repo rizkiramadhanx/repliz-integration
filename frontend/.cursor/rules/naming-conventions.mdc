@@ -1,0 +1,35 @@
+# Naming Conventions
+
+## File Naming
+- **React Components**: Use PascalCase (e.g., `UserProfile.tsx`, `ModalDeleteConfirmation.tsx`)
+- **Custom Hooks**: Use `use` prefix with camelCase (e.g., `useGetAllRole.tsx`, `useMutateAddRole.tsx`)
+- **Page Components**: Use `page-` prefix with kebab-case (e.g., `page-role.tsx`, `page-user.tsx`)
+- **Type Definitions**: Use camelCase (e.g., `type.ts`, `fetching.ts`)
+
+## Folder Naming
+- **Feature Folders**: Use kebab-case (e.g., `master-data/`, `stock-opname/`, `activity-log/`)
+- **Component Folders**: Use kebab-case (e.g., `modal-delete-confirmation/`, `button/`)
+- **Utility Folders**: Use lowercase (e.g., `hooks/`, `libs/`, `utils/`, `types/`)
+
+## Variable Naming
+- **Variables & Functions**: Use camelCase (e.g., `userData`, `handleSubmit`, `isLoading`)
+- **Constants**: Use UPPER_SNAKE_CASE (e.g., `API_BASE_URL`, `MAX_RETRY_ATTEMPTS`)
+- **Boolean Variables**: Use `is`, `has`, `can`, `should` prefixes (e.g., `isVisible`, `hasPermission`)
+
+## Type Naming
+- **Interfaces**: Use PascalCase (e.g., `UserData`, `StockOpnameForm`)
+- **Type Aliases**: Use PascalCase (e.g., `UserRole`, `ApiResponse<T>`)
+- **Enums**: Use PascalCase with UPPER_CASE values (e.g., `UserStatus.ACTIVE`)
+
+## Import/Export
+- **Named Exports**: Use PascalCase for components, camelCase for functions
+- **Default Exports**: Use PascalCase for components, camelCase for hooks
+- **Import Statements**: Use exact casing as exported names
+
+## React Query Hooks
+- **Query Hooks**: Use `useGet[Entity]` pattern (e.g., `useGetAllRole`, `useGetAllUser`)
+- **Mutation Hooks**: Use `useMutate[Action][Entity]` pattern (e.g., `useMutateAddRole`, `useMutateDeleteRole`)
+description:
+globs:
+alwaysApply: true
+---

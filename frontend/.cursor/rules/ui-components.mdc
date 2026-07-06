@@ -1,0 +1,60 @@
+# UI Components & Mantine Usage
+
+## Mantine UI 8 Components
+
+The project uses Mantine UI 8 as the primary component library. Always prefer Mantine components over custom HTML elements.
+
+### Layout Components
+
+- **Container, Box, Flex, Group, Stack**: Use for layout and spacing
+- **Grid, SimpleGrid**: Use for responsive grid layouts
+- **Card**: Use for content containers with elevation
+
+### Form Components
+
+- **TextInput, PasswordInput**: Use for text input fields
+- **Select, MultiSelect**: Use for dropdown selections
+- **Switch, Checkbox, Radio**: Use for boolean/toggle inputs
+- **DatePickerInput**: Use for date inputs
+- **Textarea, NumberInput**: Use for multi-line text and numbers
+- **FileInput**: Use for file uploads
+
+### Data Display
+
+- **Table**: Use for data tables with built-in features
+- **Pagination**: Use for paginated data
+- **Badge, Chip**: Use for status indicators
+- **Loader**: Use for loading states
+
+### Feedback & Overlay
+
+- **Modal**: Use for dialogs and forms
+- **Notifications**: Use for success/error messages (see [src/components/layout/Provider.tsx](mdc:src/components/layout/Provider.tsx))
+- **Alert**: Use for important information
+- **Tooltip, Popover**: Use for additional information
+
+## Custom Component Patterns
+
+- **Modal Pattern**: Consistent modal implementation with close button and actions
+- **Form Pattern**: React Hook Form + Zod + Mantine components
+- **Table Pattern**: Standardized data table with actions and pagination
+- **Button Pattern**: Consistent button sizing and colors
+
+## Styling Guidelines
+
+- **Theme**: Use custom theme from [src/styles/theme.ts](mdc:src/styles/theme.ts)
+- **Colors**: Use Mantine color system (primary, secondary, success, warning, error)
+- **Spacing**: Use Mantine spacing scale (xs, sm, md, lg, xl)
+- **Responsive**: Use Mantine responsive utilities and breakpoints
+
+## Component Organization
+
+- **Layout Components**: Place in `src/components/layout/`
+- **Molecule Components**: Place in `src/components/moleculs/`
+- **Feature Components**: Place in `src/features/[feature]/components/`
+- **Page Components**: Place in `src/features/[feature]/` with `page-` prefix
+  description:
+  globs:
+  alwaysApply: true
+
+---

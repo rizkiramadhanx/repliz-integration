@@ -1,0 +1,36 @@
+# SPARK ERP Frontend Project Structure
+
+## Core Architecture
+This is a React 19 + TypeScript ERP frontend application using feature-based architecture. The main entry point is [src/App.tsx](mdc:src/App.tsx) which loads the routing configuration from [src/routes/index.tsx](mdc:src/routes/index.tsx).
+
+## Key Directories
+- **`src/features/`** - Feature-based modules (master-data, stock-opname, authentication, etc.)
+- **`src/components/`** - Shared/reusable components organized by type
+- **`src/hooks/`** - Custom React hooks including [useDebounceCallback.tsx](mdc:src/hooks/useDebounceCallback.tsx)
+- **`src/libs/`** - Library configurations including [axios.ts](mdc:src/libs/axios.ts) and [react-query.tsx](mdc:src/libs/react-query.tsx)
+- **`src/store/`** - Zustand state management stores
+- **`src/routes/`** - React Router configuration files
+
+## Feature Module Pattern
+Each feature follows this structure:
+```
+features/[feature-name]/
+├── components/     # Feature-specific components
+├── hooks/         # Feature-specific hooks (useGet, useMutate)
+├── types.ts       # TypeScript type definitions
+└── page-[feature].tsx  # Main feature page
+```
+
+## State Management
+- **Zustand** for client state (see [src/store/user.ts](mdc:src/store/user.ts))
+- **React Query (TanStack Query)** for server state management
+- **React Hook Form** for form state with Zod validation
+
+## UI Framework
+- **Mantine UI 8** as the primary component library
+- **Emotion** for CSS-in-JS styling
+- **PostCSS** for CSS processing with Mantine presets
+description:
+globs:
+alwaysApply: true
+---

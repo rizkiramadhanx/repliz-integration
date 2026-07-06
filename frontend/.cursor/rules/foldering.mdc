@@ -1,0 +1,279 @@
+# Folder Structure & Code Organization
+
+## 📁 Struktur Folder Utama
+
+```
+src/
+├── components/          # Shared/Reusable Components
+│   ├── layout/         # Layout Components
+│   ├── moleculs/       # Molecule Components
+│   └── page/           # Page-specific Components
+├── features/           # Feature-based Modules
+├── hooks/              # Custom React Hooks
+├── libs/               # Library Configurations
+├── routes/             # Routing Configuration
+├── store/              # State Management
+├── styles/             # Global Styles & Theme
+├── types/              # TypeScript Definitions
+├── utils/              # Utility Functions
+├── enum/               # Enumeration & Constants
+└── assets/             # Static Assets
+```
+
+## 🎯 Prinsip Organisasi Kode
+
+### 1. Feature-Based Architecture
+
+- Setiap fitur memiliki folder sendiri di `features/`
+- Struktur konsisten untuk setiap fitur
+- Separation of concerns yang jelas
+- Modular dan scalable
+
+### 2. Component Hierarchy
+
+```
+components/
+├── layout/             # Layout-level components
+│   ├── dashboard-layout.tsx
+│   ├── guest-layout.tsx
+│   ├── protected-layout.tsx
+│   ├── Provider.tsx
+│   ├── Sidebar.tsx
+│   └── Topbar.tsx
+├── moleculs/           # Reusable molecule components
+│   ├── button/
+│   ├── modal/
+│   └── PaginationTotal.tsx
+└── page/               # Page-specific components
+    ├── page-not-found.tsx
+    └── page-not-resource.tsx
+```
+
+### 3. Feature Structure Pattern
+
+```
+features/
+├── [feature-name]/
+│   ├── components/     # Feature-specific components
+│   ├── hooks/          # Feature-specific hooks
+│   ├── types.ts        # Feature type definitions
+│   ├── page-[feature].tsx  # Main feature page
+│   └── [id]/           # Dynamic routes (if applicable)
+│       └── page-[feature]-detail.tsx
+```
+
+## 📂 Detail Struktur Folder
+
+### `/components`
+
+- **layout/**: Dashboard, Guest, Protected layouts, Sidebar, Topbar
+- **moleculs/**: Button, Modal, Pagination, Form components
+- **page/**: 404, Not Found, Error pages
+
+### `/features`
+
+- **activity-log/**: Logging dan history management
+- **analytic/**: Dashboard dan analytics
+- **authentication/**: Login, register, password management
+- **history-stock-opname/**: Historical stock opname data
+- **management-inventory/**: Inventory management system
+- **master-data/**: Master data CRUD operations
+  - **user/**: User management
+  - **role/**: Role management
+  - **employee/**: Employee management
+  - **supplier/**: Supplier management
+  - **working-location/**: Working location management
+  - **rack/**: Rack management
+  - **stock/**: Stock management
+- **purchasing/**: Purchase order dan receipt system
+- **stock-opname/**: Stock opname operations
+  - **dashboard/**: Stock opname dashboard
+  - **delegation-rack/**: Rack delegation
+  - **different-location/**: Location differences
+  - **different-quantity/**: Quantity differences
+  - **log/**: Stock opname logs
+  - **result-log/**: Result logs
+  - **shrinkage/**: Shrinkage calculations
+  - **report-location/**: Location reports
+
+### `/hooks`
+
+- **useDebounceCallback.tsx**: Debounced callback hook
+- Custom React hooks untuk logic reuse
+- Business logic separation
+- State management helpers
+
+### `/libs`
+
+- **axios.ts**: HTTP client configuration (ERP & Auth instances)
+- **dayjs.ts**: Date handling setup
+- **react-query.tsx**: Data fetching configuration
+
+### `/routes`
+
+- **index.tsx**: Main routing configuration
+- **authentication.tsx**: Auth routes
+- **master-data.tsx**: Master data routes
+- **stock-opname.tsx**: Stock opname routes
+- **purchasing.tsx**: Purchasing routes
+- **activity-log.tsx**: Activity log routes
+- **history-stock-opname.tsx**: History routes
+- **management-inventory.tsx**: Inventory routes
+
+### `/store`
+
+- **user.ts**: User state management (Zustand)
+- **navigation.ts**: Navigation state management
+- **dashboard-stock-opname.ts**: Dashboard state
+
+### `/styles`
+
+- **global.css**: Global styles
+- **theme.ts**: Mantine theme configuration
+- CSS variables dan utilities
+
+### `/types`
+
+- **fetching.ts**: API response types
+- Global TypeScript interfaces
+- Shared type definitions
+
+### `/utils`
+
+- **common-function.ts**: Common utility functions
+- **currency.ts**: Currency formatting
+- Helper functions
+
+### `/enum`
+
+- **action.ts**: Action permissions
+- **application.ts**: Application constants
+- **routes.ts**: Route definitions
+- **sidebar.tsx**: Sidebar menu configuration
+
+## 🔄 Folder Naming Conventions
+
+### Feature Folders
+
+- Use kebab-case: `activity-log`, `master-data`, `stock-opname`
+- Descriptive names: `management-inventory`, `working-location`
+- Group related features: `history-stock-opname`
+
+### Component Folders
+
+- Use kebab-case: `modal-delete-confirmation`, `page-not-found`
+- Descriptive prefixes: `page-`, `modal-`, `form-`
+- Group by functionality: `button/`, `modal/`
+
+### File Naming
+
+- Components: `PascalCase.tsx`
+- Hooks: `useCamelCase.tsx`
+- Types: `camelCase.ts`
+- Pages: `page-feature-name.tsx`
+- Layouts: `feature-layout.tsx`
+
+## 📋 Best Practices
+
+### 1. File Organization
+
+- One component per file
+- Related files in same folder
+- Clear separation of concerns
+- Consistent file structure
+
+### 2. Import Structure
+
+- Absolute imports dengan alias `@/`
+- Relative imports untuk feature-specific code
+- Barrel exports untuk clean imports
+- Organized import statements
+
+### 3. Code Splitting
+
+- Lazy load feature routes
+- Separate vendor chunks
+- Optimize bundle size
+- Route-based code splitting
+
+### 4. Scalability
+
+- Easy to add new features
+- Consistent structure across features
+- Maintainable codebase
+- Team collaboration friendly
+
+## 🎯 Folder Structure Benefits
+
+### 1. Maintainability
+
+- Easy to locate files
+- Clear responsibility separation
+- Reduced cognitive load
+- Organized code structure
+
+### 2. Scalability
+
+- Easy to add new features
+- Consistent patterns
+- Team collaboration friendly
+- Modular architecture
+
+### 3. Performance
+
+- Code splitting ready
+- Lazy loading support
+- Optimized imports
+- Efficient bundling
+
+### 4. Developer Experience
+
+- Intuitive navigation
+- Clear file organization
+- Reduced search time
+- Consistent patterns
+
+## 🔍 Special Patterns
+
+### Dynamic Routes
+
+```
+features/
+├── master-data/
+│   └── role/
+│       ├── [id]/              # Dynamic route
+│       │   └── page-detail-role.tsx
+│       └── page-role.tsx
+```
+
+### Shared Components
+
+```
+components/
+├── moleculs/
+│   └── modal/
+│       ├── modal-delete-confirmation.tsx
+│       └── modal-sync-working-loc.tsx
+```
+
+### Feature Hooks
+
+```
+features/
+├── master-data/
+│   └── role/
+│       ├── hooks/
+│       │   ├── useGetAllRole.tsx
+│       │   ├── useMutateAddRole.tsx
+│       │   └── useMutateDeleteRole.tsx
+```
+
+---
+
+**Last Updated**: [Current Date]
+**Maintainer**: [Team Name]
+description:
+globs:
+alwaysApply: true
+
+---

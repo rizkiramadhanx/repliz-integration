@@ -1,0 +1,61 @@
+* {
+  font-family: "Plus Jakarta Sans", sans-serif;
+}
+
+:root {
+  --mantine-color-orange-0: #f9e6d1;
+  --mantine-color-orange-1: #f1c9aa;
+  --mantine-color-orange-2: #e9aa7f;
+  --mantine-color-orange-3: #df8b54;
+  --mantine-color-orange-4: #d96e2f;
+  --mantine-color-orange-5: #b85a23;
+  --mantine-color-orange-6: #9e4d1c;
+  --mantine-color-orange-7: #7d3b14;
+  --mantine-color-orange-8: #5d2b0e;
+  --mantine-color-orange-9: #3d1b08;
+
+  --mantine-color-green-0: #e0f3e8;
+  --mantine-color-green-1: #c0e7d2;
+  --mantine-color-green-2: #9edcbb;
+  --mantine-color-green-3: #7cd0a3;
+  --mantine-color-green-4: #58c58b;
+  --mantine-color-green-5: #38b972;
+  --mantine-color-green-6: #289350;
+  --mantine-color-green-7: #1f6f3c;
+  --mantine-color-green-8: #154b28;
+  --mantine-color-green-9: #0a2714;
+
+  --mantine-color-red-0: #ffeaec;
+  --mantine-color-red-1: #fcd4d7;
+  --mantine-color-red-2: #f4a7ac;
+  --mantine-color-red-3: #ec777e;
+  --mantine-color-red-4: #e64f57;
+  --mantine-color-red-5: #e3353f;
+  --mantine-color-red-6: #e22732;
+  --mantine-color-red-7: #c91a25;
+  --mantine-color-red-8: #b41220;
+  --mantine-color-red-9: #9e0419;
+
+  --mantine-color-blue-0: #e5f3ff;
+  --mantine-color-blue-1: #cde2ff;
+  --mantine-color-blue-2: #9ac2ff;
+  --mantine-color-blue-3: #64a0ff;
+  --mantine-color-blue-4: #3884fe;
+  --mantine-color-blue-5: #1d72fe;
+  --mantine-color-blue-6: #0063ff;
+  --mantine-color-blue-7: #0058e4;
+  --mantine-color-blue-8: #004ecd;
+  --mantine-color-blue-9: #0043b5;
+
+  --table-border-color: #873c3c;
+}
+.mantine-Table-thead {
+  background-color: var(--mantine-color-primary-6);
+  overflow: hidden;
+  color: white;
+}
+
+.mantine-Table-table {
+  border-radius: 2px;
+  overflow: hidden;
+}

@@ -1,0 +1,33 @@
+import { Module } from '@nestjs/common';
+import { ScheduleModule } from '@nestjs/schedule';
+import { AppController } from './app.controller';
+import { AppService } from './app.service';
+import { AuthModule } from './modules/auth/auth.module';
+import { UsersModule } from './modules/users/users.module';
+import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
+import { RolesModule } from './modules/roles/roles.module';
+import { APP_INTERCEPTOR } from '@nestjs/core';
+import { MailModule } from './modules/mailer/mailer.module';
+import { LogsModule } from './modules/logs/logs.module';
+import { ItemsModule } from './modules/items/items.module';
+
+@Module({
+  imports: [
+    ScheduleModule.forRoot(),
+    LogsModule,
+    AuthModule,
+    UsersModule,
+    MailModule,
+    RolesModule,
+    ItemsModule,
+  ],
+  controllers: [AppController],
+  providers: [
+    AppService,
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: LoggingInterceptor,
+    },
+  ],
+})
+export class AppModule {}

@@ -1,0 +1,45 @@
+# CRUD Module Patterns
+
+## Standard CRUD Structure
+Every CRUD module should follow this pattern based on [src/features/master-data/role/](mdc:src/features/master-data/role/):
+
+```
+features/[module-name]/
+├── components/
+│   ├── modal-add-[module].tsx
+│   ├── modal-edit-[module].tsx
+│   └── [other-components].tsx
+├── hooks/
+│   ├── useGetAll[Module].tsx
+│   ├── useMutateAdd[Module].tsx
+│   ├── useMutateEdit[Module].tsx
+│   └── useMutateDelete[Module].tsx
+├── types.ts
+└── page-[module].tsx
+```
+
+## React Query Hook Patterns
+- **GET Hook**: `useGetAll[Module]` - for fetching data with pagination, search, and filters
+- **CREATE Hook**: `useMutateAdd[Module]` - for creating new records
+- **UPDATE Hook**: `useMutateEdit[Module]` - for updating existing records
+- **DELETE Hook**: `useMutateDelete[Module]` - for deleting records
+
+## Form Integration
+- **React Hook Form** with **Zod** validation (see [src/features/master-data/role/components/modal-add-role.tsx](mdc:src/features/master-data/role/components/modal-add-role.tsx))
+- **Form Schema**: Define validation rules using Zod
+- **Form State**: Use `useForm` hook with `zodResolver`
+
+## Page Component Pattern
+- **Search & Filter**: Implement debounced search using [useDebounceCallback.tsx](mdc:src/hooks/useDebounceCallback.tsx)
+- **Data Table**: Use Mantine Table component with pagination
+- **Modal Management**: State management for add/edit/delete modals
+- **Success/Error Handling**: Use Mantine notifications for user feedback
+
+## Type Definitions
+- **Base Type**: `typeData[Module]` with standard fields (id, isActive, name, timestamps, audit fields)
+- **Form Schema**: `Add[Module]Schema` and `Edit[Module]Schema` using Zod inference
+- **API Response**: Use `typeDataCommonResponse<T>` wrapper for consistent API responses
+description:
+globs:
+alwaysApply: true
+---

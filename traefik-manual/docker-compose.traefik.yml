@@ -1,0 +1,38 @@
+services:
+  traefik:
+    image: traefik:v3.5
+    restart: unless-stopped
+    environment:
+      # Docker SDK bawaan image Traefik defaultnya minta API version lama (1.24)
+      # yang ditolak Docker daemon versi baru (minimum 1.40) — tanpa ini Traefik
+      # gagal total konek ke docker.sock, jadi tidak pernah baca label container apa
+      # pun (semua domain selalu 404, bukan soal network/label yang salah).
+      - DOCKER_API_VERSION=1.44
+    command:
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --providers.docker.network=ternak-sosmed-network
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+      - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      - --entrypoints.web.http.redirections.entrypoint.scheme=https
+      - --certificatesresolvers.letsencrypt.acme.httpchallenge=true
+      - --certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web
+      - --certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL:?ACME_EMAIL is required}
+      - --certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - traefik_letsencrypt:/letsencrypt
+    networks:
+      - ternak-sosmed-network
+
+networks:
+  ternak-sosmed-network:
+    name: ternak-sosmed-network
+    external: true
+
+volumes:
+  traefik_letsencrypt:
