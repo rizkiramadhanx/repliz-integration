@@ -36,6 +36,16 @@ const ACTION_ROLES = [
     name: 'post-history',
     actions: ['post-history:read'],
   },
+  {
+    name: 'scheduled-post',
+    actions: [
+      'scheduled-post:create',
+      'scheduled-post:read',
+      'scheduled-post:update',
+      'scheduled-post:delete',
+      'scheduled-post:run',
+    ],
+  },
 ];
 
 export default ACTION_ROLES;

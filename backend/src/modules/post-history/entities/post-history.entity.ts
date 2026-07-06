@@ -21,6 +21,7 @@ export const POST_HISTORY_TRIGGER_SOURCES = [
   'instagram_run_now',
   'template_scheduled',
   'template_run_now',
+  'scheduled_post',
 ] as const;
 export type PostHistoryTriggerSource =
   (typeof POST_HISTORY_TRIGGER_SOURCES)[number];

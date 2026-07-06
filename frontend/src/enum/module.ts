@@ -32,4 +32,11 @@ export const MODULE_LIST = {
   PostHistory: {
     Read: "post-history:read",
   },
+  ScheduledPost: {
+    Create: "scheduled-post:create",
+    Read: "scheduled-post:read",
+    Update: "scheduled-post:update",
+    Delete: "scheduled-post:delete",
+    Run: "scheduled-post:run",
+  },
 };

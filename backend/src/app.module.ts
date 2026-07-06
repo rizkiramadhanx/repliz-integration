@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ScheduleModule } from '@nestjs/schedule';
 import { BullModule } from '@nestjs/bullmq';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -14,10 +15,12 @@ import { LogsModule } from './modules/logs/logs.module';
 import { AccountsModule } from './modules/accounts/accounts.module';
 import { PostHistoryModule } from './modules/post-history/post-history.module';
 import { AutoPostRulesModule } from './modules/auto-post-rules/auto-post-rules.module';
+import { ScheduledPostsModule } from './modules/scheduled-posts/scheduled-posts.module';
 
 @Module({
   imports: [
     ScheduleModule.forRoot(),
+    EventEmitterModule.forRoot(),
     BullModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -37,6 +40,7 @@ import { AutoPostRulesModule } from './modules/auto-post-rules/auto-post-rules.m
     AccountsModule,
     PostHistoryModule,
     AutoPostRulesModule,
+    ScheduledPostsModule,
   ],
   controllers: [AppController],
   providers: [

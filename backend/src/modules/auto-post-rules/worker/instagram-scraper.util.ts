@@ -13,6 +13,7 @@ export interface ScrapedInstagramPost {
   caption: string;
   mediaUrl: string;
   isVideo: boolean;
+  thumbnailUrl: string | null;
 }
 
 function extractCaption(ogDescription: string | null): string {
@@ -197,11 +198,17 @@ async function scrapePostDetail(
   const mediaUrl = resolvedVideoUrl ?? highResImage ?? ogImage;
   if (!mediaUrl) return null;
 
+  // Untuk video, og:image tetap ada (cover frame yang di-generate Instagram
+  // sendiri) — dipakai sebagai preview gambar terpisah dari mediaUrl (video
+  // asli yang dipublish), supaya UI bisa tampilkan thumbnail untuk video juga.
+  const thumbnailUrl = isVideo ? ogImage : mediaUrl;
+
   return {
     shortcode,
     caption: extractCaption(ogDescription),
     mediaUrl,
     isVideo,
+    thumbnailUrl,
   };
 }
 
@@ -280,9 +287,15 @@ export async function scrapeLatestInstagramPosts(
   browsingAccount: AccountEntity,
   targetUsername: string,
   limit = 5,
+  excludeShortcodes: Set<string> = new Set(),
 ): Promise<ScrapedInstagramPost[]> {
   return withInstagramSession(browsingAccount, async (page) => {
-    const shortcodes = await listRecentShortcodes(page, targetUsername, limit);
+    const shortcodes = await listRecentShortcodes(
+      page,
+      targetUsername,
+      limit,
+      excludeShortcodes,
+    );
 
     if (shortcodes.length === 0) {
       await assertLoggedIn(page, browsingAccount);
@@ -301,5 +314,32 @@ export async function scrapeLatestInstagramPosts(
       if (post) posts.push(post);
     }
     return posts;
+  });
+}
+
+function parseShortcodeAndTypeFromUrl(url: string): {
+  shortcode: string;
+  isVideo: boolean;
+} {
+  const match = url.match(/\/(p|reel)\/([^/?]+)/);
+  if (!match) {
+    throw new Error(
+      `URL tidak valid, tidak ditemukan format /p/ atau /reel/: ${url}`,
+    );
+  }
+  return { shortcode: match[2], isVideo: match[1] === 'reel' };
+}
+
+export async function scrapeInstagramPostByUrl(
+  browsingAccount: AccountEntity,
+  postUrl: string,
+): Promise<ScrapedInstagramPost | null> {
+  const { shortcode, isVideo } = parseShortcodeAndTypeFromUrl(postUrl);
+  return withInstagramSession(browsingAccount, async (page) => {
+    const post = await scrapePostDetail(page, '', shortcode, isVideo);
+    if (!post) {
+      await assertLoggedIn(page, browsingAccount);
+    }
+    return post;
   });
 }

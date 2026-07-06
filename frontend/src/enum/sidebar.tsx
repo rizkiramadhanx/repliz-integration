@@ -4,7 +4,7 @@ import { ReactNode } from "react";
 import { BiUser } from "react-icons/bi";
 import { FaDatabase } from "react-icons/fa";
 import { HiShieldCheck } from "react-icons/hi";
-import { MdHistory, MdRule, MdOutlineHistory } from "react-icons/md";
+import { MdHistory, MdRule, MdOutlineHistory, MdSchedule } from "react-icons/md";
 import { FaUserShield } from "react-icons/fa6";
 
 export type SidebarMenuChild = {
@@ -55,16 +55,22 @@ const SidebarMenu: SidebarMenuItem[] = [
     modules: [MODULE_LIST.MasterData.AutoPostRule.Read],
   },
   {
-    title: "Log Aktivitas",
-    icon: <MdHistory />,
-    path: ROUTES.Log.View,
-    modules: [MODULE_LIST.Log.Read],
+    title: "Penjadwalan Posting",
+    icon: <MdSchedule />,
+    path: ROUTES.ScheduledPost.View,
+    modules: [MODULE_LIST.ScheduledPost.Read],
   },
   {
     title: "Riwayat Post",
     icon: <MdOutlineHistory />,
     path: ROUTES.PostHistory.View,
     modules: [MODULE_LIST.PostHistory.Read],
+  },
+  {
+    title: "Log Aktivitas",
+    icon: <MdHistory />,
+    path: ROUTES.Log.View,
+    modules: [MODULE_LIST.Log.Read],
   },
 ];
 

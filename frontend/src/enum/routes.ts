@@ -23,4 +23,7 @@ export const ROUTES = {
   PostHistory: {
     View: "/post-history",
   },
+  ScheduledPost: {
+    View: "/scheduled-post",
+  },
 };

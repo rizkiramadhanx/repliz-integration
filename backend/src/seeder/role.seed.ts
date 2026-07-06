@@ -27,12 +27,21 @@ const ROLES: { name: string; actions: string[] }[] = [
       'auto-post-rule:update',
       'auto-post-rule:run',
       'post-history:read',
+      'scheduled-post:create',
+      'scheduled-post:read',
+      'scheduled-post:update',
+      'scheduled-post:run',
     ],
   },
   {
     // Operator — akses terbatas, akun sosmed diakses lewat delegasi
     name: 'Operator',
-    actions: ['account:read', 'auto-post-rule:read', 'post-history:read'],
+    actions: [
+      'account:read',
+      'auto-post-rule:read',
+      'post-history:read',
+      'scheduled-post:read',
+    ],
   },
 ];
 
