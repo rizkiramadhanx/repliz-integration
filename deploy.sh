@@ -7,14 +7,20 @@
 #   - DNS BACKEND_DOMAIN & FRONTEND_DOMAIN (di .env) sudah A-record ke IP VPS ini
 #   - Port 80 & 443 terbuka di firewall
 #   - traefik-manual/docker-compose.traefik.yml sudah dijalankan (lihat langkah 2 di bawah)
-#   - Network eksternal Traefik (skrep-network) sudah ada — cek nama network
-#     yang benar dengan: docker inspect <traefik-container> --format '{{json .Config.Cmd}}'
-#     lalu cari flag --providers.docker.network=<nama>
+#
+# CATATAN: network eksternal "ternak-sosmed-network" dipakai BERSAMA oleh
+# Traefik (traefik-manual/docker-compose.traefik.yml) dan app ini
+# (docker-compose.yml). Kalau ada project LAIN di VPS yang sama yang juga
+# pakai Traefik ini, pastikan --providers.docker.network di config Traefik
+# tidak di-restrict ke network project lain — cek dengan:
+#   docker inspect <traefik-container> --format '{{json .Config.Cmd}}'
+# JANGAN pernah `docker compose down` network ini dari project lain manapun.
 
 set -euo pipefail
 cd "$(dirname "$0")"
 
 COMPOSE="docker compose -f docker-compose.yml"
+APP_NETWORK="ternak-sosmed-network"
 
 echo "==> 1. Memastikan .env ada"
 if [ ! -f .env ]; then
@@ -30,14 +36,13 @@ set -a; source .env; set +a
 DB_NAME="${DB_NAME:-ternak_sosmed}"
 DB_USERNAME="${DB_USERNAME:-postgres}"
 
-echo "==> 2. Memastikan network Traefik eksternal ada"
-TRAEFIK_NETWORK="skrep-network"
-if ! docker network inspect "$TRAEFIK_NETWORK" >/dev/null 2>&1; then
-  echo "    ERROR: network '$TRAEFIK_NETWORK' tidak ditemukan."
-  echo "    Pastikan Traefik sudah jalan dan network ini sudah dibuat sebelumnya."
-  exit 1
+echo "==> 2. Memastikan network eksternal ${APP_NETWORK} ada"
+if ! docker network inspect "$APP_NETWORK" >/dev/null 2>&1; then
+  echo "    Network ${APP_NETWORK} belum ada, membuat..."
+  docker network create "$APP_NETWORK"
+else
+  echo "    Network $APP_NETWORK ditemukan."
 fi
-echo "    Network $TRAEFIK_NETWORK ditemukan."
 
 echo "==> 3. Pull perubahan terbaru dari git (skip kalau bukan git repo)"
 if [ -d .git ]; then
