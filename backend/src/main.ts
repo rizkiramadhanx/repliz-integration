@@ -33,6 +33,25 @@ async function bootstrap() {
         'http://localhost:4321',
       ];
 
+      // Domain frontend production dari env (FRONT_END_URL) — otomatis
+      // sertakan varian dengan/tanpa "www." supaya kedua bentuk domain
+      // yang dilayani Traefik (lihat docker-compose.yml) tidak kena CORS.
+      if (process.env.FRONT_END_URL) {
+        try {
+          const url = new URL(process.env.FRONT_END_URL);
+          allowedOrigins.push(url.origin);
+          if (url.hostname.startsWith('www.')) {
+            allowedOrigins.push(
+              `${url.protocol}//${url.hostname.replace(/^www\./, '')}`,
+            );
+          } else {
+            allowedOrigins.push(`${url.protocol}//www.${url.hostname}`);
+          }
+        } catch {
+          // FRONT_END_URL tidak valid sebagai URL — abaikan, jangan crash bootstrap
+        }
+      }
+
       if (allowedOrigins.includes(origin)) {
         return callback(null, true);
       }
