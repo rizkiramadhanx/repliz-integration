@@ -14,7 +14,7 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - ternak-sosmed-network
+      - internal
 
   redis:
     image: redis:7-alpine
@@ -27,7 +27,7 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - ternak-sosmed-network
+      - internal
 
   backend:
     build: ./backend
@@ -60,9 +60,11 @@ services:
       redis:
         condition: service_healthy
     networks:
-      - ternak-sosmed-network
+      - internal
+      - skrep-network
     labels:
       - traefik.enable=true
+      - traefik.docker.network=skrep-network
       - traefik.http.routers.ternak-sosmed-backend.rule=Host(`${BACKEND_DOMAIN}`)
       - traefik.http.routers.ternak-sosmed-backend.entrypoints=websecure
       - traefik.http.routers.ternak-sosmed-backend.tls.certResolver=letsencrypt
@@ -77,9 +79,10 @@ services:
     depends_on:
       - backend
     networks:
-      - ternak-sosmed-network
+      - skrep-network
     labels:
       - traefik.enable=true
+      - traefik.docker.network=skrep-network
       - traefik.http.routers.ternak-sosmed-frontend.rule=Host(`${FRONTEND_DOMAIN}`)
       - traefik.http.routers.ternak-sosmed-frontend.entrypoints=websecure
       - traefik.http.routers.ternak-sosmed-frontend.tls.certResolver=letsencrypt
@@ -91,5 +94,6 @@ volumes:
   app_uploads:
 
 networks:
-  ternak-sosmed-network:
+  internal:
+  skrep-network:
     external: true
