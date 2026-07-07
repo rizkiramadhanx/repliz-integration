@@ -1,9 +1,11 @@
+import CredentialsFields from "@/features/master-data/account/components/credentials-fields";
+import { defaultCredentials } from "@/features/master-data/account/utils/default-credentials";
 import useMutateEditAccount from "@/features/master-data/account/hooks/useMutateEditAccount";
 import type { typeDataAccount } from "@/features/master-data/account/type";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Button, Group, Modal, Stack, TextInput } from "@mantine/core";
+import { Button, Group, Modal, Stack, Switch, Text, TextInput } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { MdOutlineClose } from "react-icons/md";
 import { z } from "zod";
@@ -36,9 +38,14 @@ export default function ModalEditAccount({
     defaultValues: { label: "" },
   });
 
+  const [replaceCredentials, setReplaceCredentials] = useState(false);
+  const [credentials, setCredentials] = useState<Record<string, unknown>>({});
+
   useEffect(() => {
     if (defaultValue) {
       reset({ label: defaultValue.label });
+      setReplaceCredentials(false);
+      setCredentials(defaultCredentials(defaultValue.type));
     }
   }, [defaultValue, reset]);
 
@@ -46,13 +53,20 @@ export default function ModalEditAccount({
 
   const handleFormClose = () => {
     reset();
+    setReplaceCredentials(false);
     onClose();
   };
 
   const onSubmit = (dataForm: EditAccountSchema) => {
     if (!defaultValue?.id) return;
     mutate(
-      { accountId: defaultValue.id, payload: { label: dataForm.label } },
+      {
+        accountId: defaultValue.id,
+        payload: {
+          label: dataForm.label,
+          credentials: replaceCredentials ? credentials : undefined,
+        },
+      },
       {
         onSuccess: () => {
           handleFormClose();
@@ -86,6 +100,27 @@ export default function ModalEditAccount({
             error={errors.label?.message}
             {...register("label")}
           />
+
+          <Switch
+            label="Ganti cookie / kredensial session"
+            description="Aktifkan kalau ingin memasukkan cookie baru (mis. session lama sudah expired). Kalau tidak diaktifkan, cookie yang tersimpan tidak berubah."
+            checked={replaceCredentials}
+            onChange={(e) => setReplaceCredentials(e.currentTarget.checked)}
+          />
+
+          {replaceCredentials && defaultValue && (
+            <>
+              <Text size="xs" c="dimmed">
+                Isi ulang semua field di bawah ini — nilai lama tidak ditampilkan
+                karena alasan keamanan (tidak pernah dikirim balik dari server).
+              </Text>
+              <CredentialsFields
+                type={defaultValue.type}
+                value={credentials}
+                onChange={setCredentials}
+              />
+            </>
+          )}
         </Stack>
 
         <Group justify="end" mt="lg">

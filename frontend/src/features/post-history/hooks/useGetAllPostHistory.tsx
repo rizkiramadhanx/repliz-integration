@@ -36,5 +36,6 @@ export default function useGetAllPostHistory({
 
       return response;
     },
+    refetchInterval: 5000,
   });
 }
