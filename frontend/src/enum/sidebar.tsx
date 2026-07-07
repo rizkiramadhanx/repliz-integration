@@ -40,13 +40,13 @@ const SidebarMenu: SidebarMenuItem[] = [
         path: ROUTES.MasterData.Role.View,
         modules: [MODULE_LIST.MasterData.Role.Read],
       },
-      {
-        title: "Account",
-        icon: <FaUserShield />,
-        path: ROUTES.MasterData.Account.View,
-        modules: [MODULE_LIST.MasterData.Account.Read],
-      },
     ],
+  },
+  {
+    title: "Account",
+    icon: <FaUserShield />,
+    path: ROUTES.MasterData.Account.View,
+    modules: [MODULE_LIST.MasterData.Account.Read],
   },
   {
     title: "Auto Post Rule",
