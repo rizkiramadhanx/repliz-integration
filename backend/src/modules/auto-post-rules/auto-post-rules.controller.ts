@@ -19,6 +19,7 @@ import { Response } from 'express';
 import { AutoPostRulesService } from './auto-post-rules.service';
 import {
   CreateAutoPostRuleDto,
+  RunNowDto,
   UpdateAutoPostRuleDto,
 } from './dto/auto-post-rule.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -283,6 +284,7 @@ export class AutoPostRulesController {
   @Permissions('auto-post-rule:run')
   async runNow(
     @Param('ruleId', ParseUUIDPipe) ruleId: string,
+    @Body() body: RunNowDto,
     @CurrentUser() currentUser: CurrentUserType,
     @Res({ passthrough: true }) res: Response,
   ) {
@@ -291,6 +293,7 @@ export class AutoPostRulesController {
         ruleId,
         currentUser.id,
         isAdmin(currentUser),
+        body?.count,
       );
       await this.logsService.createLog({
         action: 'auto-post-rule:run',

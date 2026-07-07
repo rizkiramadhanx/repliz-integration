@@ -471,7 +471,7 @@ export class AutoPostRulesService {
     return true;
   }
 
-  async runNow(id: string, userId: string, isAdmin: boolean) {
+  async runNow(id: string, userId: string, isAdmin: boolean, count?: number) {
     const rule = await this.findOrFail(id);
 
     if (!isAdmin) {
@@ -501,7 +501,7 @@ export class AutoPostRulesService {
       case 'discord_observer':
         return this.discordObserverManager.runRuleNow(rule.id);
       case 'instagram_observer':
-        return this.instagramObserverManager.runRuleNow(rule.id);
+        return this.instagramObserverManager.runRuleNow(rule.id, count);
       case 'template':
         return this.templateObserverManager.runRuleNow(rule.id);
     }

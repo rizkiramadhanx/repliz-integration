@@ -100,7 +100,7 @@ export class InstagramObserverManager implements OnModuleInit, OnModuleDestroy {
     await this.processRule(rule, OBSERVER_SCRAPE_LIMIT);
   }
 
-  async runRuleNow(ruleId: string): Promise<void> {
+  async runRuleNow(ruleId: string, count?: number): Promise<void> {
     const rule = await this.ruleRepo.findOne({ where: { id: ruleId } });
     if (!rule) {
       throw new Error(`Auto post rule ${ruleId} not found`);
@@ -108,7 +108,11 @@ export class InstagramObserverManager implements OnModuleInit, OnModuleDestroy {
     if (rule.triggerType !== 'instagram_observer') {
       throw new Error(`Rule ${ruleId} bukan tipe instagram_observer`);
     }
-    await this.processRule(rule, RUN_NOW_SCRAPE_LIMIT, 'instagram_run_now');
+    await this.processRule(
+      rule,
+      count ?? RUN_NOW_SCRAPE_LIMIT,
+      'instagram_run_now',
+    );
   }
 
   private async processRule(
@@ -142,9 +146,14 @@ export class InstagramObserverManager implements OnModuleInit, OnModuleDestroy {
           browsingAccount,
           username,
           scrapeLimit,
+          undefined,
+          rule.instagramScrapeMode,
         );
 
+        let publishedCount = 0;
         for (const post of posts) {
+          if (publishedCount >= scrapeLimit) break;
+
           const alreadyProcessed = await this.processedRepo.findOne({
             where: { ruleId: rule.id, sourceItemId: post.shortcode },
           });
@@ -158,11 +167,7 @@ export class InstagramObserverManager implements OnModuleInit, OnModuleDestroy {
               sourceItemId: post.shortcode,
             }),
           );
-
-          if (triggerSource === 'instagram_run_now') {
-            // run-now hanya perlu memproses post terbaru per username
-            break;
-          }
+          publishedCount++;
         }
       } catch (err) {
         this.logger.error(
