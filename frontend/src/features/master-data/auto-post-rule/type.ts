@@ -64,6 +64,7 @@ export type typeDataCreateAutoPostRulePayload = {
   excludeKeywords?: string[];
   includeOriginalCaption?: boolean;
   instagramCheckIntervalMinutes?: number;
+  instagramScrapeMode?: "posts" | "reels";
   targets: typeAutoPostTarget[];
   facebookAccountId?: string;
   facebookPostMode?: typeFacebookPostMode;
