@@ -1,5 +1,6 @@
 import NotFound from "@/components/page/page-not-found";
 import AuthenticationRoutes from "@/routes/authentication";
+import GuideRoutes from "@/routes/guide";
 import LogRoutes from "@/routes/log";
 import PostHistoryRoutes from "@/routes/post-history";
 import ScheduledPostRoutes from "@/routes/scheduled-post";
@@ -13,6 +14,7 @@ function AllRoutes() {
     ...LogRoutes,
     ...PostHistoryRoutes,
     ...ScheduledPostRoutes,
+    ...GuideRoutes,
     {
       path: "*",
       element: <NotFound />,

@@ -32,7 +32,10 @@ function getVisibleMenu(
         if (visibleChildren.length === 0) return null;
         return { ...item, visibleChildren };
       }
-      if (item.modules?.length && userHasAnyModule(userModules, item.modules)) {
+      if (!item.modules?.length) {
+        return { ...item, visibleChildren: undefined };
+      }
+      if (userHasAnyModule(userModules, item.modules)) {
         return { ...item, visibleChildren: undefined };
       }
       return null;

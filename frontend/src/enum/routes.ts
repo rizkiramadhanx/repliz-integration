@@ -26,4 +26,7 @@ export const ROUTES = {
   ScheduledPost: {
     View: "/scheduled-post",
   },
+  Guide: {
+    View: "/guide",
+  },
 };
