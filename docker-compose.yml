@@ -83,9 +83,11 @@ services:
     labels:
       - traefik.enable=true
       - traefik.docker.network=ternak-sosmed-network
-      - traefik.http.routers.ternak-sosmed-frontend.rule=Host(`${FRONTEND_DOMAIN}`)
+      - traefik.http.routers.ternak-sosmed-frontend.rule=Host(`${FRONTEND_DOMAIN}`) || Host(`www.${FRONTEND_DOMAIN}`)
       - traefik.http.routers.ternak-sosmed-frontend.entrypoints=websecure
       - traefik.http.routers.ternak-sosmed-frontend.tls.certResolver=letsencrypt
+      - traefik.http.routers.ternak-sosmed-frontend.tls.domains[0].main=${FRONTEND_DOMAIN}
+      - traefik.http.routers.ternak-sosmed-frontend.tls.domains[0].sans=www.${FRONTEND_DOMAIN}
       - traefik.http.services.ternak-sosmed-frontend.loadbalancer.server.port=80
 
 volumes:
