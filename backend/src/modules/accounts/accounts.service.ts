@@ -261,6 +261,12 @@ export class AccountsService {
     account.connectionStatus = result.ok ? 'connected' : 'error';
     account.connectionError = result.ok ? null : (result.error ?? null);
     account.lastCheckedAt = new Date();
+    if (result.ok && result.username) {
+      account.credentials = {
+        ...account.credentials,
+        username: result.username,
+      };
+    }
     await this.accountRepo.save(account);
 
     return result;

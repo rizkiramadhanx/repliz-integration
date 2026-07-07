@@ -85,12 +85,44 @@ export class InstagramPublisher {
         });
         await page.waitForTimeout(3000);
 
-        await page.locator('svg[aria-label="New post"]').first().click();
+        const newPostButton = page
+          .locator('svg[aria-label="New post"]')
+          .first();
+        await newPostButton.waitFor({ timeout: 15000 });
+        await newPostButton.click();
         await page.waitForTimeout(1000);
-        await page.getByRole('link', { name: 'Post Post' }).click();
-        await page.waitForTimeout(1500);
 
+        // Instagram punya dua varian UI: sebagian akun langsung membuka modal
+        // "Create new post" berisi input file, sebagian lain membuka dropdown
+        // menu (Post/Live video/Ad) yang perlu diklik dulu untuk sampai ke
+        // modal upload. Coba tunggu input file singkat dulu; kalau tidak
+        // muncul, asumsikan varian dropdown dan klik link "Post".
         const fileInput = page.locator('input[type="file"]');
+        const fileInputAppeared = await fileInput
+          .first()
+          .waitFor({ timeout: 5000, state: 'attached' })
+          .then(() => true)
+          .catch(() => false);
+
+        if (!fileInputAppeared) {
+          const postLink = page.getByRole('link', { name: 'Post Post' });
+          await postLink.click();
+          await page.waitForTimeout(1000);
+
+          try {
+            await fileInput
+              .first()
+              .waitFor({ timeout: 15000, state: 'attached' });
+          } catch (err) {
+            await page
+              .screenshot({
+                path: `/tmp/ig-publish-fail-${account.id}-${Date.now()}.png`,
+              })
+              .catch(() => {});
+            throw err;
+          }
+        }
+
         await fileInput.first().setInputFiles(options.mediaPath);
         await page.waitForTimeout(isVideo ? 5000 : 2000);
 
