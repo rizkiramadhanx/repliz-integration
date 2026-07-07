@@ -1,9 +1,36 @@
-import { Accordion, Alert, Anchor, Code, List, Stack, Text, Title } from "@mantine/core";
+import {
+  Accordion,
+  Alert,
+  Anchor,
+  Box,
+  Button,
+  Code,
+  Group,
+  List,
+  Stack,
+  Text,
+} from "@mantine/core";
+import { TiArrowBack } from "react-icons/ti";
+import { useNavigate } from "react-router";
 
 export default function PageGuide() {
+  const navigate = useNavigate();
+
   return (
-    <Stack>
-      <Title order={2}>Panduan Ambil Kredensial Akun</Title>
+    <Box px={20} py={10}>
+      <Group mb="md">
+        <Button
+          variant="filled"
+          color="primary"
+          size="xs"
+          onClick={() => navigate(-1)}
+        >
+          <TiArrowBack />
+        </Button>
+        <Text fw={600}>Panduan Ambil Kredensial Akun</Text>
+      </Group>
+
+      <Stack>
       <Alert color="yellow" title="Perhatian">
         Cookie Instagram/Twitter/Facebook dan token Discord (self-bot) adalah data sensitif yang
         setara dengan password akun. Mengambil/menggunakannya untuk automasi melanggar Ketentuan
@@ -210,6 +237,7 @@ export default function PageGuide() {
           </Accordion.Panel>
         </Accordion.Item>
       </Accordion>
-    </Stack>
+      </Stack>
+    </Box>
   );
 }
