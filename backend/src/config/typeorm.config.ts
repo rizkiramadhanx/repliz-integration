@@ -1,3 +1,4 @@
+import { join } from 'path';
 import { DataSource } from 'typeorm';
 import { config } from 'dotenv';
 import { UserEntity } from '../modules/users/entities/user.entity';
@@ -7,6 +8,12 @@ import { AccountEntity } from '../modules/accounts/entities/account.entity';
 import { AccountDelegationEntity } from '../modules/accounts/entities/account-delegation.entity';
 
 config();
+
+// __dirname resolve ke src/config saat dijalankan via ts-node (dev/migration
+// CLI) dan ke dist/config saat dijalankan dari build hasil `nest build`
+// (production) — jadi ekstensi file migration ikut benar otomatis (.ts vs .js)
+// tanpa perlu 2 config terpisah.
+const migrationExt = __filename.endsWith('.ts') ? 'ts' : 'js';
 
 export default new DataSource({
   type: 'postgres',
@@ -22,7 +29,7 @@ export default new DataSource({
     AccountEntity,
     AccountDelegationEntity,
   ],
-  migrations: ['src/migration/*.ts'],
+  migrations: [join(__dirname, '..', 'migration', `*.${migrationExt}`)],
   synchronize: false,
   logging: true,
 });

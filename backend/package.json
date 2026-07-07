@@ -24,6 +24,7 @@
     "migration:revert": "npm run typeorm -- migration:revert -d src/config/typeorm.config.ts",
     "migration:create": "npm run typeorm -- migration:create",
     "migration:show": "npm run typeorm -- migration:show -d src/config/typeorm.config.ts",
+    "migration:run:prod": "typeorm migration:run -d dist/config/typeorm.config.js",
     "seeder": "ts-node -r tsconfig-paths/register src/seeder/seeder-runner.ts"
   },
   "dependencies": {
