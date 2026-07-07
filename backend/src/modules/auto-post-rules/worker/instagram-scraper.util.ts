@@ -47,20 +47,24 @@ async function readShortcodesFromDom(
   return result;
 }
 
+export type InstagramScrapeMode = 'posts' | 'reels';
+
 async function listRecentShortcodes(
   page: Page,
   targetUsername: string,
   limit: number,
   excludeShortcodes: Set<string> = new Set(),
+  scrapeMode: InstagramScrapeMode = 'posts',
 ): Promise<{ shortcode: string; isVideo: boolean }[]> {
-  await page.goto(`https://www.instagram.com/${targetUsername}/`, {
+  const path = scrapeMode === 'reels' ? `${targetUsername}/reels/` : `${targetUsername}/`;
+  await page.goto(`https://www.instagram.com/${path}`, {
     waitUntil: 'domcontentloaded',
     timeout: 30000,
   });
   await page.waitForTimeout(3000);
 
-  const MAX_SCROLL_ATTEMPTS = 20;
-  const MAX_CONSECUTIVE_NO_PROGRESS = 3;
+  const MAX_SCROLL_ATTEMPTS = 40;
+  const MAX_CONSECUTIVE_NO_PROGRESS = 5;
   let attempts = 0;
   let consecutiveNoProgress = 0;
   let domItems = await readShortcodesFromDom(page);
@@ -69,7 +73,7 @@ async function listRecentShortcodes(
   while (fresh.length < limit && attempts < MAX_SCROLL_ATTEMPTS) {
     const previousCount = domItems.length;
     await page.mouse.wheel(0, 4000);
-    await page.waitForTimeout(2500);
+    await page.waitForTimeout(3500);
     attempts += 1;
 
     domItems = await readShortcodesFromDom(page);
@@ -108,18 +112,18 @@ interface EmbeddedMediaItem {
 
 async function findMediaItemFromEmbeddedJson(
   page: Page,
+  shortcode: string,
 ): Promise<EmbeddedMediaItem | null> {
-  const candidates = await page.$$eval(
-    'script[type="application/json"]',
-    (els) =>
-      els
-        .map((el) => el.textContent ?? '')
-        .filter((text) =>
-          text.includes('xdt_api__v1__media__shortcode__web_info'),
-        ),
+  const allScripts = await page.$$eval('script[type="application/json"]', (els) =>
+    els.map((el) => el.textContent ?? ''),
   );
 
-  for (const raw of candidates) {
+  // Jalur normal: post/reel diakses lewat /p/ atau /reel/ (dengan username)
+  // membawa blok "xdt_api__v1__media__shortcode__web_info" berisi items[0].
+  const webInfoCandidates = allScripts.filter((text) =>
+    text.includes('xdt_api__v1__media__shortcode__web_info'),
+  );
+  for (const raw of webInfoCandidates) {
     try {
       const parsed = JSON.parse(raw);
       const webInfo = findKeyDeep(
@@ -128,6 +132,32 @@ async function findMediaItemFromEmbeddedJson(
       ) as { items?: EmbeddedMediaItem[] } | undefined;
       const item = webInfo?.items?.[0];
       if (item) return item;
+    } catch {
+      continue;
+    }
+  }
+
+  // Fallback: Instagram kadang redirect /reel/{shortcode}/ (tanpa username)
+  // ke tab Clips (/reels/{shortcode}/), yang membawa blok berbeda
+  // ("xdt_api__v1__clips__home__connection_v2") tanpa struktur items[0].
+  // Cari langsung node media yang shortcode-nya cocok lewat traversal generik.
+  const clipsCandidates = allScripts.filter(
+    (text) => text.includes('video_versions') && text.includes(shortcode),
+  );
+  for (const raw of clipsCandidates) {
+    try {
+      const parsed = JSON.parse(raw);
+      const code = findKeyDeep(parsed, 'code');
+      if (code !== shortcode) continue;
+      const videoVersions = findKeyDeep(parsed, 'video_versions') as
+        | EmbeddedMediaItem['video_versions']
+        | undefined;
+      const imageVersions2 = findKeyDeep(parsed, 'image_versions2') as
+        | EmbeddedMediaItem['image_versions2']
+        | undefined;
+      if (videoVersions || imageVersions2) {
+        return { video_versions: videoVersions, image_versions2: imageVersions2 };
+      }
     } catch {
       continue;
     }
@@ -168,7 +198,7 @@ async function scrapePostDetail(
     .catch(() => null);
 
   const mediaItem = await withTimeout(
-    findMediaItemFromEmbeddedJson(page),
+    findMediaItemFromEmbeddedJson(page, shortcode),
     10000,
   );
 
@@ -288,6 +318,7 @@ export async function scrapeLatestInstagramPosts(
   targetUsername: string,
   limit = 5,
   excludeShortcodes: Set<string> = new Set(),
+  scrapeMode: InstagramScrapeMode = 'posts',
 ): Promise<ScrapedInstagramPost[]> {
   return withInstagramSession(browsingAccount, async (page) => {
     const shortcodes = await listRecentShortcodes(
@@ -295,6 +326,7 @@ export async function scrapeLatestInstagramPosts(
       targetUsername,
       limit,
       excludeShortcodes,
+      scrapeMode,
     );
 
     if (shortcodes.length === 0) {
