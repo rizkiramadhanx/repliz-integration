@@ -13,9 +13,10 @@ export default registerAs(
     entities: [__dirname + '/../../modules/**/entities/*.entity.{js,ts}'],
     synchronize: false,
     autoLoadEntities: true,
-    ssl:
-      process.env.NODE_ENV === 'production'
-        ? { rejectUnauthorized: false }
-        : false,
+    // SSL untuk koneksi DB dipisah dari NODE_ENV secara sengaja — Postgres
+    // self-hosted (container polos di docker-compose.yml) tidak setup SSL,
+    // beda dari DB cloud terkelola (RDS/Supabase/dst) yang biasanya wajib
+    // SSL. Default off; set DB_SSL=true kalau pindah ke DB yang butuh SSL.
+    ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
   }),
 );
