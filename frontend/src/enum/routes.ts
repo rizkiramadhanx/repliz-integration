@@ -29,4 +29,7 @@ export const ROUTES = {
   Guide: {
     View: "/guide",
   },
+  Tools: {
+    View: "/tools",
+  },
 };

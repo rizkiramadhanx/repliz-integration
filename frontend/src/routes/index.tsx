@@ -4,6 +4,7 @@ import GuideRoutes from "@/routes/guide";
 import LogRoutes from "@/routes/log";
 import PostHistoryRoutes from "@/routes/post-history";
 import ScheduledPostRoutes from "@/routes/scheduled-post";
+import ToolsRoutes from "@/routes/tools";
 import { BrowserRouter, useRoutes } from "react-router";
 import MasterDataRoutes from "@/routes/master-data";
 
@@ -15,6 +16,7 @@ function AllRoutes() {
     ...PostHistoryRoutes,
     ...ScheduledPostRoutes,
     ...GuideRoutes,
+    ...ToolsRoutes,
     {
       path: "*",
       element: <NotFound />,

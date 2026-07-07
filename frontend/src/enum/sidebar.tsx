@@ -4,7 +4,7 @@ import { ReactNode } from "react";
 import { BiUser } from "react-icons/bi";
 import { FaDatabase } from "react-icons/fa";
 import { HiShieldCheck } from "react-icons/hi";
-import { MdHistory, MdRule, MdOutlineHistory, MdSchedule, MdHelpOutline } from "react-icons/md";
+import { MdHistory, MdRule, MdOutlineHistory, MdSchedule, MdHelpOutline, MdBuild } from "react-icons/md";
 import { FaUserShield } from "react-icons/fa6";
 
 export type SidebarMenuChild = {
@@ -71,6 +71,11 @@ const SidebarMenu: SidebarMenuItem[] = [
     icon: <MdHistory />,
     path: ROUTES.Log.View,
     modules: [MODULE_LIST.Log.Read],
+  },
+  {
+    title: "Tools Lainnya",
+    icon: <MdBuild />,
+    path: ROUTES.Tools.View,
   },
   {
     title: "Panduan",
