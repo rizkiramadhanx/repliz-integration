@@ -55,7 +55,7 @@ export default function ModalScrapeBatch({
   // muncul lewat polling biasa selama batch masih berjalan.
   const { data: batchDetailData } = useGetScrapeBatchDetail(batchJobId, {
     refetchInterval: (query) => {
-      const status = query.state.data?.data?.status;
+      const status = query.state.data?.data?.data?.status;
       return status === "running" || !status ? 2000 : false;
     },
   });
@@ -63,10 +63,10 @@ export default function ModalScrapeBatch({
 
   const progress = socketProgress ?? {
     batchJobId: batchJobId ?? "",
-    fetchedCount: batchDetailData?.data?.fetched_count ?? 0,
-    totalLimit: batchDetailData?.data?.total_limit ?? (totalLimit || 0),
-    status: batchDetailData?.data?.status ?? "running",
-    errorMessage: batchDetailData?.data?.error_message ?? undefined,
+    fetchedCount: batchDetailData?.data?.data?.fetched_count ?? 0,
+    totalLimit: batchDetailData?.data?.data?.total_limit ?? (totalLimit || 0),
+    status: batchDetailData?.data?.data?.status ?? "running",
+    errorMessage: batchDetailData?.data?.data?.error_message ?? undefined,
   };
 
   const posts = useMemo(() => {

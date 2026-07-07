@@ -1,12 +1,17 @@
 import { axiosInstanceAPI } from "@/libs/axios";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, type QueryObserverOptions } from "@tanstack/react-query";
+import type { AxiosResponse } from "axios";
 import type { typeDataScrapeBatchJob } from "../type";
 
 type typeDataScrapeBatchDetailResponse = { data: typeDataScrapeBatchJob };
 
+type typeQueryData = AxiosResponse<typeDataScrapeBatchDetailResponse>;
+
 export default function useGetScrapeBatchDetail(
   batchJobId: string | null,
-  options?: { refetchInterval?: number | false },
+  options?: {
+    refetchInterval?: QueryObserverOptions<typeQueryData>["refetchInterval"];
+  },
 ) {
   return useQuery({
     queryKey: ["scrape-batch-detail", batchJobId],
