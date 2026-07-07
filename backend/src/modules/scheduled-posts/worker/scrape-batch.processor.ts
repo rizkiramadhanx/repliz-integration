@@ -112,6 +112,7 @@ export class ScrapeBatchProcessor extends WorkerHost {
         batch.targetUsername,
         quota,
         excludeSet,
+        batch.scrapeMode,
       );
     } catch (err) {
       const message =

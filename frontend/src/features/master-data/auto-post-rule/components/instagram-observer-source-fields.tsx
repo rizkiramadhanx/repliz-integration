@@ -1,6 +1,13 @@
 import useGetAllAccount from "@/features/master-data/account/hooks/useGetAllAccount";
 import type { typeDataAccount } from "@/features/master-data/account/type";
-import { NumberInput, Select, Stack, Switch, TagsInput } from "@mantine/core";
+import {
+  NumberInput,
+  Select,
+  SegmentedControl,
+  Stack,
+  Switch,
+  TagsInput,
+} from "@mantine/core";
 
 export type InstagramObserverSourceValue = {
   instagramObserverAccountId?: string;
@@ -8,6 +15,7 @@ export type InstagramObserverSourceValue = {
   excludeKeywords: string[];
   includeOriginalCaption: boolean;
   instagramCheckIntervalMinutes?: number;
+  instagramScrapeMode: "posts" | "reels";
 };
 
 export default function InstagramObserverSourceFields({
@@ -46,6 +54,24 @@ export default function InstagramObserverSourceFields({
           onChange({ ...value, instagramTargetUsernames: val })
         }
       />
+      <div>
+        <label style={{ fontSize: 14, fontWeight: 500, display: "block", marginBottom: 4 }}>
+          Sumber Scrape
+        </label>
+        <SegmentedControl
+          data={[
+            { label: "Posts", value: "posts" },
+            { label: "Reels", value: "reels" },
+          ]}
+          value={value.instagramScrapeMode}
+          onChange={(val) =>
+            onChange({
+              ...value,
+              instagramScrapeMode: val as "posts" | "reels",
+            })
+          }
+        />
+      </div>
       <TagsInput
         label="Kata yang Dihapus dari Caption"
         description="Opsional. Tekan Enter untuk menambah kata/frasa"

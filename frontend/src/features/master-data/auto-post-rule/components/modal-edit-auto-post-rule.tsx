@@ -41,6 +41,7 @@ const schema = z.object({
   excludeKeywords: z.array(z.string()).optional(),
   includeOriginalCaption: z.boolean(),
   instagramCheckIntervalMinutes: z.number().optional(),
+  instagramScrapeMode: z.enum(["posts", "reels"]),
   targets: z
     .array(z.enum(["facebook", "instagram", "telegram", "twitter"]))
     .min(1, "Pilih minimal satu target platform"),
@@ -89,6 +90,7 @@ function toFormValues(
     includeOriginalCaption: rule?.include_original_caption ?? true,
     instagramCheckIntervalMinutes:
       rule?.instagram_check_interval_minutes ?? 60,
+    instagramScrapeMode: rule?.instagram_scrape_mode ?? "posts",
     targets: rule?.targets ?? [],
     facebookAccountId: rule?.facebook_account_id ?? undefined,
     facebookPostMode: rule?.facebook_post_mode ?? "wall",
@@ -223,6 +225,10 @@ export default function ModalEditAutoPostRule({
           instagramCheckIntervalMinutes:
             triggerType === "instagram_observer"
               ? dataForm.instagramCheckIntervalMinutes
+              : undefined,
+          instagramScrapeMode:
+            triggerType === "instagram_observer"
+              ? dataForm.instagramScrapeMode
               : undefined,
           targets: dataForm.targets,
           facebookAccountId: dataForm.targets.includes("facebook")
@@ -372,6 +378,7 @@ export default function ModalEditAutoPostRule({
                     includeOriginalCaption: formValue.includeOriginalCaption,
                     instagramCheckIntervalMinutes:
                       formValue.instagramCheckIntervalMinutes,
+                    instagramScrapeMode: formValue.instagramScrapeMode,
                   }}
                   onChange={(next) => {
                     setValue(
@@ -395,6 +402,11 @@ export default function ModalEditAutoPostRule({
                     setValue(
                       "instagramCheckIntervalMinutes",
                       next.instagramCheckIntervalMinutes,
+                      { shouldValidate: true },
+                    );
+                    setValue(
+                      "instagramScrapeMode",
+                      next.instagramScrapeMode,
                       { shouldValidate: true },
                     );
                   }}

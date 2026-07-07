@@ -44,6 +44,7 @@ export class ScrapeBatchesService {
       target_username: row.targetUsername,
       batch_size: row.batchSize,
       total_limit: row.totalLimit,
+      scrape_mode: row.scrapeMode,
       fetched_count: row.fetchedCount,
       status: row.status,
       error_message: row.errorMessage,
@@ -77,6 +78,7 @@ export class ScrapeBatchesService {
       targetUsername,
       batchSize: 10,
       totalLimit: dto.totalLimit,
+      scrapeMode: dto.scrapeMode ?? 'posts',
       fetchedCount: 0,
       status: 'running',
     });

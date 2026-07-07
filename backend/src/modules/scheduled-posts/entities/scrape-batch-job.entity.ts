@@ -44,6 +44,10 @@ export class ScrapeBatchJobEntity {
   @Expose({ name: 'total_limit' })
   totalLimit: number;
 
+  @Column({ name: 'scrape_mode', type: 'varchar', default: 'posts' })
+  @Expose({ name: 'scrape_mode' })
+  scrapeMode: 'posts' | 'reels';
+
   @Column({ name: 'fetched_count', type: 'int', default: 0 })
   @Expose({ name: 'fetched_count' })
   fetchedCount: number;

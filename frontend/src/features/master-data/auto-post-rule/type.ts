@@ -31,6 +31,7 @@ export type typeDataAutoPostRule = {
   exclude_keywords: string[] | null;
   include_original_caption: boolean;
   instagram_check_interval_minutes: number | null;
+  instagram_scrape_mode: "posts" | "reels";
   targets: typeAutoPostTarget[];
   facebook_account_id: string | null;
   facebook_post_mode: typeFacebookPostMode | null;

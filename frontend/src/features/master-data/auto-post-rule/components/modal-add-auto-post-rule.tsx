@@ -40,6 +40,7 @@ const schema = z.object({
   excludeKeywords: z.array(z.string()).optional(),
   includeOriginalCaption: z.boolean(),
   instagramCheckIntervalMinutes: z.number().optional(),
+  instagramScrapeMode: z.enum(["posts", "reels"]),
   targets: z
     .array(z.enum(["facebook", "instagram", "telegram", "twitter"]))
     .min(1, "Pilih minimal satu target platform"),
@@ -77,6 +78,7 @@ const DEFAULT_VALUES: AddAutoPostRuleSchema = {
   excludeKeywords: [],
   includeOriginalCaption: true,
   instagramCheckIntervalMinutes: 60,
+  instagramScrapeMode: "posts",
   targets: [],
   facebookAccountId: undefined,
   facebookPostMode: "wall",
@@ -250,6 +252,10 @@ export default function ModalAddAutoPostRule({
         instagramCheckIntervalMinutes:
           triggerType === "instagram_observer"
             ? dataForm.instagramCheckIntervalMinutes
+            : undefined,
+        instagramScrapeMode:
+          triggerType === "instagram_observer"
+            ? dataForm.instagramScrapeMode
             : undefined,
         targets: dataForm.targets,
         facebookAccountId: dataForm.targets.includes("facebook")
@@ -438,6 +444,7 @@ export default function ModalAddAutoPostRule({
                       includeOriginalCaption: formValue.includeOriginalCaption,
                       instagramCheckIntervalMinutes:
                         formValue.instagramCheckIntervalMinutes,
+                      instagramScrapeMode: formValue.instagramScrapeMode,
                     }}
                     onChange={(next) => {
                       setValue(
@@ -461,6 +468,11 @@ export default function ModalAddAutoPostRule({
                       setValue(
                         "instagramCheckIntervalMinutes",
                         next.instagramCheckIntervalMinutes,
+                        { shouldValidate: true },
+                      );
+                      setValue(
+                        "instagramScrapeMode",
+                        next.instagramScrapeMode,
                         { shouldValidate: true },
                       );
                     }}

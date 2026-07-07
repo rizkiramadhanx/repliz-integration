@@ -28,6 +28,13 @@ import {
 
 export const MIN_INSTAGRAM_OBSERVER_INTERVAL_MINUTES = 60;
 
+export class RunNowDto {
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  count?: number;
+}
+
 export class CaptionReplacementDto {
   @IsString()
   @IsNotEmpty()
@@ -79,6 +86,10 @@ export class CreateAutoPostRuleDto {
   @Min(MIN_INSTAGRAM_OBSERVER_INTERVAL_MINUTES)
   @IsOptional()
   instagramCheckIntervalMinutes?: number;
+
+  @IsIn(['posts', 'reels'])
+  @IsOptional()
+  instagramScrapeMode?: 'posts' | 'reels';
 
   @IsArray()
   @ArrayMinSize(1)
@@ -203,6 +214,10 @@ export class UpdateAutoPostRuleDto {
   @Min(MIN_INSTAGRAM_OBSERVER_INTERVAL_MINUTES)
   @IsOptional()
   instagramCheckIntervalMinutes?: number;
+
+  @IsIn(['posts', 'reels'])
+  @IsOptional()
+  instagramScrapeMode?: 'posts' | 'reels';
 
   @IsArray()
   @ArrayMinSize(1)

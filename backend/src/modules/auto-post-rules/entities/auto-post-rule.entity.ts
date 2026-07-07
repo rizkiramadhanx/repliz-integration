@@ -95,6 +95,14 @@ export class AutoPostRuleEntity {
   @Expose({ name: 'instagram_check_interval_minutes' })
   instagramCheckIntervalMinutes: number | null;
 
+  @Column({
+    name: 'instagram_scrape_mode',
+    type: 'varchar',
+    default: 'posts',
+  })
+  @Expose({ name: 'instagram_scrape_mode' })
+  instagramScrapeMode: 'posts' | 'reels';
+
   @Column({ name: 'template_media_path', type: 'text', nullable: true })
   @Expose({ name: 'template_media_path' })
   templateMediaPath: string | null;

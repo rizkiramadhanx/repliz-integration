@@ -43,6 +43,7 @@ export type typeDataScrapeBatchJob = {
   target_username: string;
   batch_size: number;
   total_limit: number;
+  scrape_mode: "posts" | "reels";
   fetched_count: number;
   status: typeScrapeBatchStatus;
   error_message: string | null;

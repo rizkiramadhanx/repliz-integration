@@ -7,6 +7,7 @@ import {
   Modal,
   NumberInput,
   Progress,
+  SegmentedControl,
   Select,
   Stack,
   Text,
@@ -36,6 +37,7 @@ export default function ModalScrapeBatch({
   const [sourceAccountId, setSourceAccountId] = useState<string | null>(null);
   const [targetUsername, setTargetUsername] = useState("");
   const [totalLimit, setTotalLimit] = useState<number | "">(10);
+  const [scrapeMode, setScrapeMode] = useState<"posts" | "reels">("posts");
   const [error, setError] = useState("");
   const [batchJobId, setBatchJobId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -103,7 +105,7 @@ export default function ModalScrapeBatch({
       return;
     }
     startBatch(
-      { sourceAccountId, targetUsername, totalLimit },
+      { sourceAccountId, targetUsername, totalLimit, scrapeMode },
       {
         onSuccess: (res) => {
           setBatchJobId(res.data.id);
@@ -185,6 +187,19 @@ export default function ModalScrapeBatch({
               onChange={(v) => setTotalLimit(typeof v === "number" ? v : "")}
               w={120}
             />
+            <Stack gap={4}>
+              <Text size="sm" fw={500}>
+                Sumber
+              </Text>
+              <SegmentedControl
+                data={[
+                  { label: "Posts", value: "posts" },
+                  { label: "Reels", value: "reels" },
+                ]}
+                value={scrapeMode}
+                onChange={(v) => setScrapeMode(v as "posts" | "reels")}
+              />
+            </Stack>
             <Button loading={isStarting} onClick={handleStart}>
               Mulai Scrape
             </Button>
@@ -193,8 +208,10 @@ export default function ModalScrapeBatch({
           <Stack gap="xs">
             <Group justify="space-between">
               <Text size="sm">
-                Scraping @{targetUsername} — {progress.fetchedCount}/
-                {progress.totalLimit} post ({progress.status})
+                {progress.status === "completed" &&
+                progress.fetchedCount < progress.totalLimit
+                  ? `Selesai — @${targetUsername} hanya punya ${progress.fetchedCount} post tersedia (dari target ${progress.totalLimit})`
+                  : `Scraping @${targetUsername} — ${progress.fetchedCount}/${progress.totalLimit} post (${progress.status})`}
               </Text>
               {isRunning && (
                 <Button size="xs" color="orange" variant="light" onClick={handleStop}>

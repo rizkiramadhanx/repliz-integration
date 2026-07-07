@@ -1,4 +1,12 @@
-import { IsArray, IsInt, IsString, IsUUID, Min } from 'class-validator';
+import {
+  IsArray,
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Min,
+} from 'class-validator';
 
 export class StartScrapeBatchDto {
   @IsUUID()
@@ -10,6 +18,10 @@ export class StartScrapeBatchDto {
   @IsInt()
   @Min(1)
   totalLimit: number;
+
+  @IsIn(['posts', 'reels'])
+  @IsOptional()
+  scrapeMode?: 'posts' | 'reels';
 }
 
 export class GenerateDraftsFromScrapeDto {

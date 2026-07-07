@@ -10,16 +10,18 @@ export default function useMutateStartScrapeBatch() {
       sourceAccountId,
       targetUsername,
       totalLimit,
+      scrapeMode,
     }: {
       sourceAccountId: string;
       targetUsername: string;
       totalLimit: number;
+      scrapeMode?: "posts" | "reels";
     }) => {
       const response =
         await axiosInstanceAPI.request<typeStartScrapeBatchResponse>({
           method: "POST",
           url: "/api/scrape-batches",
-          data: { sourceAccountId, targetUsername, totalLimit },
+          data: { sourceAccountId, targetUsername, totalLimit, scrapeMode },
         });
       return response.data;
     },
