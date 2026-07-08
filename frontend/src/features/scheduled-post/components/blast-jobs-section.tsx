@@ -15,7 +15,8 @@ import { useState } from "react";
 import useGetAllBlastJobs from "../hooks/useGetAllBlastJobs";
 import useMutateStopBlast from "../hooks/useMutateStopBlast";
 import ModalBlast from "./modal-blast";
-import type { typeBlastJobStatus } from "../type";
+import ModalDuplicateBlast from "./modal-duplicate-blast";
+import type { typeBlastJobStatus, typeDataBlastJob } from "../type";
 
 const PAGE_LIMIT = 10;
 
@@ -36,6 +37,8 @@ const STATUS_LABEL: Record<typeBlastJobStatus, string> = {
 export default function BlastJobsSection() {
   const [blastModalOpen, setBlastModalOpen] = useState(false);
   const [scrapeGroupModalOpen, setScrapeGroupModalOpen] = useState(false);
+  const [duplicateSource, setDuplicateSource] =
+    useState<typeDataBlastJob | null>(null);
   const [page, setPage] = useState(1);
 
   const { data, refetch } = useGetAllBlastJobs(
@@ -131,16 +134,25 @@ export default function BlastJobsSection() {
                     </Badge>
                   </Table.Td>
                   <Table.Td>
-                    {j.status === "running" && (
+                    <Group gap="xs" wrap="nowrap">
+                      {j.status === "running" && (
+                        <Button
+                          size="xs"
+                          color="orange"
+                          variant="light"
+                          onClick={() => handleStop(j.id)}
+                        >
+                          Stop
+                        </Button>
+                      )}
                       <Button
                         size="xs"
-                        color="orange"
                         variant="light"
-                        onClick={() => handleStop(j.id)}
+                        onClick={() => setDuplicateSource(j)}
                       >
-                        Stop
+                        Duplicate
                       </Button>
-                    )}
+                    </Group>
                   </Table.Td>
                 </Table.Tr>
               ))}
@@ -171,6 +183,12 @@ export default function BlastJobsSection() {
       <ModalScrapeGroupFacebook
         open={scrapeGroupModalOpen}
         onClose={() => setScrapeGroupModalOpen(false)}
+      />
+      <ModalDuplicateBlast
+        open={duplicateSource !== null}
+        onClose={() => setDuplicateSource(null)}
+        onSuccess={() => refetch()}
+        source={duplicateSource}
       />
     </>
   );

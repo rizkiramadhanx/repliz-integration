@@ -73,6 +73,12 @@ export class ScrapeBatchesService {
       throw new BadRequestException('Username/link profil target tidak valid');
     }
 
+    // Batch lama yang masih "running" (macet karena browser/proses hang,
+    // restart server, dll) tidak akan pernah diproses lagi karena worker
+    // queue ini concurrency:1 — hentikan paksa supaya tidak menumpuk dan
+    // tidak menghalangi batch baru.
+    await this.batchRepo.update({ status: 'running' }, { status: 'stopped' });
+
     const row = this.batchRepo.create({
       sourceAccountId: dto.sourceAccountId,
       targetUsername,
