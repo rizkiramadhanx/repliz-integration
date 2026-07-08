@@ -5,7 +5,6 @@ import {
   Button,
   Popover,
   Switch,
-  Text,
   useMantineColorScheme,
 } from "@mantine/core";
 import { useMediaQuery } from "@mantine/hooks";
@@ -47,14 +46,6 @@ export default function Topbar() {
       }}
     >
       <Box display="flex" sx={{ gap: 10, alignItems: "center" }}>
-        <Box w={220} display={{ base: "none", md: "flex" }} sx={{ gap: 5 }}>
-          <Text fw={800} c="orange" size="lg">
-            Boilerplate
-          </Text>
-          <Text fw={600} c="green" size="lg">
-            App
-          </Text>
-        </Box>
         <Box
           onClick={isMobile ? toggleSidebarMobile : toggleSidebar}
           style={{ cursor: "pointer" }}
@@ -66,6 +57,24 @@ export default function Topbar() {
           )}
         </Box>
       </Box>
+
+      {!isMobile && (
+        <Box
+          sx={{
+            position: "absolute",
+            left: "50%",
+            transform: "translateX(-50%)",
+            pointerEvents: "none",
+          }}
+        >
+          <img
+            src="/logo-clean.png"
+            alt="Logo"
+            style={{ height: 40, width: "auto" }}
+          />
+        </Box>
+      )}
+
       <Box display="flex" sx={{ gap: 10, alignItems: "center" }}>
         <Switch
           sx={{ cursor: "pointer" }}

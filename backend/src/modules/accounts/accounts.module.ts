@@ -4,6 +4,7 @@ import { AccountEntity } from './entities/account.entity';
 import { AccountDelegationEntity } from './entities/account-delegation.entity';
 import { AccountsService } from './accounts.service';
 import { AccountsController } from './accounts.controller';
+import { AccountsCron } from './accounts.cron';
 import { LogsModule } from '../logs/logs.module';
 import { TelegramPublisher } from './publishers/telegram.publisher';
 import { FacebookPublisher } from './publishers/facebook.publisher';
@@ -22,6 +23,7 @@ import { CookieSessionChecker } from './connection-check/cookie-session.checker'
   controllers: [AccountsController],
   providers: [
     AccountsService,
+    AccountsCron,
     TelegramPublisher,
     FacebookPublisher,
     FacebookGroupsScraper,

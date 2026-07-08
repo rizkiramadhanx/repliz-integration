@@ -258,6 +258,26 @@ export class AccountsService {
       await this.assertHasAccess(accountId, userId);
     }
 
+    return this.runConnectionCheck(account);
+  }
+
+  /**
+   * Dipakai oleh cron job — cek semua akun tanpa access-control (tidak ada
+   * user yang login di konteks scheduled job).
+   */
+  async checkAllConnections(): Promise<void> {
+    const accounts = await this.accountRepo.find();
+    for (const account of accounts) {
+      try {
+        await this.runConnectionCheck(account);
+      } catch {
+        // Best-effort — satu akun gagal (mis. timeout Playwright) tidak
+        // boleh menghentikan pengecekan akun lain dalam batch yang sama.
+      }
+    }
+  }
+
+  private async runConnectionCheck(account: AccountEntity) {
     const result = await this.connectionCheckService.check(account);
 
     account.connectionStatus = result.ok ? 'connected' : 'error';
