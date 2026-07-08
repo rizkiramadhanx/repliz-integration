@@ -46,6 +46,8 @@ lerna-debug.log*
 # temp directory
 .temp
 .tmp
+scratch-*.ts
+scratch-*.mjs
 
 # Uploaded files
 /uploads
