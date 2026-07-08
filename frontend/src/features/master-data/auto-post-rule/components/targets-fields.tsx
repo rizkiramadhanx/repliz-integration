@@ -49,12 +49,15 @@ export default function TargetsFields({
       .filter((a) => a.type === type)
       .map((a) => ({ value: a.id, label: a.label }));
 
-  // Saat user paste hasil scrape ("id (nama grup)" per baris) ke TagsInput,
-  // ambil hanya angka ID-nya — nama grup dalam kurung tidak relevan untuk
-  // disimpan sebagai facebookGroupIds.
+  // Saat user paste hasil scrape ("id (nama grup)" per baris) atau link
+  // grup Facebook (https://facebook.com/groups/123456789/) ke TagsInput,
+  // ambil hanya angka ID-nya.
   const extractGroupId = (raw: string): string => {
-    const match = raw.trim().match(/^(\d+)/);
-    return match ? match[1] : raw.trim();
+    const trimmed = raw.trim();
+    const urlMatch = trimmed.match(/\/groups\/(\d+)/);
+    if (urlMatch) return urlMatch[1];
+    const leadingNumberMatch = trimmed.match(/^(\d+)/);
+    return leadingNumberMatch ? leadingNumberMatch[1] : trimmed;
   };
 
   const toggleTarget = (target: typeAutoPostTarget, checked: boolean) => {
@@ -128,7 +131,8 @@ export default function TargetsFields({
                 </Button>
               </Group>
               <TagsInput
-                placeholder="mis. 123456789012345"
+                description="Bisa paste link grup Facebook atau ID langsung"
+                placeholder="mis. 123456789012345 atau https://facebook.com/groups/..."
                 splitChars={["\n"]}
                 value={value.facebookGroupIds ?? []}
                 onChange={(val) =>

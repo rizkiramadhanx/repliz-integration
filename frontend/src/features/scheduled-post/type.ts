@@ -72,3 +72,47 @@ export type typeBatchProgressPayload = {
   status: typeScrapeBatchStatus;
   errorMessage?: string;
 };
+
+export type typeBlastJobStatus = "running" | "stopped" | "completed" | "failed";
+
+export type typeDataBlastJob = {
+  id: string;
+  facebook_account_id: string;
+  media_path: string | null;
+  caption: string;
+  group_ids: string[];
+  gap_minutes: number;
+  scheduled_at: string;
+  current_group_index: number;
+  total_groups: number;
+  status: typeBlastJobStatus;
+  error_message: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type typeBlastGroupResultStatus = "success" | "failed";
+
+export type typeDataBlastGroupResult = {
+  id: string;
+  blast_job_id: string;
+  group_id: string;
+  status: typeBlastGroupResultStatus;
+  error_message: string | null;
+  created_at: string;
+};
+
+export type typeBlastProgressPayload = {
+  blastJobId: string;
+  currentGroupIndex: number;
+  totalGroups: number;
+  status: typeBlastJobStatus;
+  errorMessage?: string;
+};
+
+export type typeGroupPublishedPayload = {
+  blastJobId: string;
+  groupId: string;
+  status: typeBlastGroupResultStatus;
+  errorMessage: string | null;
+};

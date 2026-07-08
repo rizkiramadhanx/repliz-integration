@@ -17,9 +17,9 @@ import { notifications } from "@mantine/notifications";
 import { useState } from "react";
 import { TiArrowBack } from "react-icons/ti";
 import { useNavigate } from "react-router";
+import BlastJobsSection from "./components/blast-jobs-section";
 import ModalAddDraft from "./components/modal-add-draft";
 import ModalEditDraft from "./components/modal-edit-draft";
-import ModalGenerateFromLink from "./components/modal-generate-from-link";
 import ModalScrapeBatch from "./components/modal-scrape-batch";
 import useGetAllScheduledPosts from "./hooks/useGetAllScheduledPosts";
 import useMutatePublishNow from "./hooks/useMutatePublishNow";
@@ -61,7 +61,6 @@ export default function PageScheduledPost() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   const [addModalOpen, setAddModalOpen] = useState(false);
-  const [generateModalOpen, setGenerateModalOpen] = useState(false);
   const [scrapeModalOpen, setScrapeModalOpen] = useState(false);
   const [editing, setEditing] = useState<typeDataScheduledPost | null>(null);
 
@@ -188,9 +187,6 @@ export default function PageScheduledPost() {
           )}
           <Button size="xs" variant="light" onClick={() => setAddModalOpen(true)}>
             Tambah Draft Manual
-          </Button>
-          <Button size="xs" color="primary" onClick={() => setGenerateModalOpen(true)}>
-            Generate dari Link
           </Button>
           <Button size="xs" variant="light" onClick={() => setScrapeModalOpen(true)}>
             Scrape dari Profil
@@ -324,17 +320,11 @@ export default function PageScheduledPost() {
         )}
       </Flex>
 
+      <BlastJobsSection />
+
       <ModalAddDraft
         open={addModalOpen}
         onClose={() => setAddModalOpen(false)}
-        onSuccess={(post) => {
-          refetch();
-          setEditing(post);
-        }}
-      />
-      <ModalGenerateFromLink
-        open={generateModalOpen}
-        onClose={() => setGenerateModalOpen(false)}
         onSuccess={(post) => {
           refetch();
           setEditing(post);

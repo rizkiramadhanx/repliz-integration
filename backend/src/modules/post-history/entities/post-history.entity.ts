@@ -22,6 +22,7 @@ export const POST_HISTORY_TRIGGER_SOURCES = [
   'template_scheduled',
   'template_run_now',
   'scheduled_post',
+  'blast',
 ] as const;
 export type PostHistoryTriggerSource =
   (typeof POST_HISTORY_TRIGGER_SOURCES)[number];
