@@ -15,6 +15,7 @@ export type typeDataAccount = {
   last_checked_at: string | null;
   created_at: string;
   updated_at: string;
+  profile_url: string | null;
 };
 
 export type typeDataCreateAccountPayload = {

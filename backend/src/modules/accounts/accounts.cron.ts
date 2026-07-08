@@ -13,7 +13,7 @@ export class AccountsCron {
 
   constructor(private readonly accountsService: AccountsService) {}
 
-  @Cron('*/20 * * * *')
+  @Cron('*/10 * * * *')
   async checkAllConnections(): Promise<void> {
     this.logger.log('Mulai cek koneksi semua akun');
     await this.accountsService.checkAllConnections();

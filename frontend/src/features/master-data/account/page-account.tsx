@@ -213,7 +213,25 @@ export default function PageAccount() {
               accounts.length > 0 &&
               accounts.map((account: typeDataAccount) => (
                 <Table.Tr key={account.id}>
-                  <Table.Td>{account.label}</Table.Td>
+                  <Table.Td>
+                    {["facebook", "instagram", "twitter"].includes(
+                      account.type,
+                    ) && account.profile_url ? (
+                      <Text
+                        size="sm"
+                        c="blue"
+                        fw={500}
+                        sx={{ cursor: "pointer", textDecoration: "underline" }}
+                        onClick={() =>
+                          window.open(account.profile_url!, "_blank", "noreferrer")
+                        }
+                      >
+                        {account.label}
+                      </Text>
+                    ) : (
+                      account.label
+                    )}
+                  </Table.Td>
                   <Table.Td>
                     <Text size="sm" tt="capitalize">
                       {account.type}

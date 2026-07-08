@@ -28,6 +28,32 @@ export class AccountsService {
     private readonly connectionCheckService: ConnectionCheckService,
   ) {}
 
+  // Hanya URL profil (info publik) yang di-expose ke frontend — cookie/token
+  // mentah di credentials tetap @Exclude() dan tidak pernah keluar dari sini.
+  private resolveProfileUrl(account: AccountEntity): string | null {
+    const username = account.credentials?.username as string | undefined;
+
+    if (account.type === 'facebook') {
+      const cookies = account.credentials?.cookies as
+        | { name: string; value: string }[]
+        | undefined;
+      const cUserId = cookies?.find((c) => c.name === 'c_user')?.value;
+      if (username) return `https://www.facebook.com/${username}`;
+      if (cUserId) return `https://www.facebook.com/profile.php?id=${cUserId}`;
+      return null;
+    }
+
+    if (account.type === 'instagram') {
+      return username ? `https://www.instagram.com/${username}` : null;
+    }
+
+    if (account.type === 'twitter') {
+      return username ? `https://x.com/${username}` : null;
+    }
+
+    return null;
+  }
+
   private serialize(account: AccountEntity) {
     return {
       id: account.id,
@@ -39,6 +65,7 @@ export class AccountsService {
       last_checked_at: account.lastCheckedAt,
       created_at: account.createdAt,
       updated_at: account.updatedAt,
+      profile_url: this.resolveProfileUrl(account),
     };
   }
 
