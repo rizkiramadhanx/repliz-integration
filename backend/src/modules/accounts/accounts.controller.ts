@@ -355,6 +355,33 @@ export class AccountsController {
     }
   }
 
+  // --- Facebook: daftar grup yang diikuti akun ---
+
+  @Post(':accountId/facebook/my-groups')
+  @Permissions('account:read')
+  async listFacebookGroups(
+    @Param('accountId', ParseUUIDPipe) accountId: string,
+    @CurrentUser() currentUser: CurrentUserType,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    try {
+      const groups = await this.accountsService.listFacebookGroups(
+        accountId,
+        currentUser.id,
+        isAdmin(currentUser),
+      );
+      res.status(HttpStatus.OK);
+      return createSuccessResponse('Facebook groups fetched', groups);
+    } catch (err) {
+      console.error('Failed list facebook groups', err);
+      res.status(HttpStatus.BAD_REQUEST);
+      return createErrorResponse(
+        err instanceof Error ? err.message : 'Failed to list facebook groups',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+  }
+
   // --- Connection check (semua tipe akun: Telegram, Discord, Twitter, Facebook, Instagram) ---
 
   @Post(':accountId/check-connection')

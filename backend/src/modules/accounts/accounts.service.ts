@@ -13,6 +13,7 @@ import { CreateAccountDto, UpdateAccountDto } from './dto/account.dto';
 import { PaginationDto } from '../../common/dto/pagination.dto';
 import { ResponseMeta } from '../../common/type/response';
 import { TelegramPublisher } from './publishers/telegram.publisher';
+import { FacebookGroupsScraper } from './publishers/facebook-groups.scraper';
 import { ConnectionCheckService } from './connection-check/connection-check.service';
 
 @Injectable()
@@ -23,6 +24,7 @@ export class AccountsService {
     @InjectRepository(AccountDelegationEntity)
     private readonly delegationRepo: Repository<AccountDelegationEntity>,
     private readonly telegramPublisher: TelegramPublisher,
+    private readonly facebookGroupsScraper: FacebookGroupsScraper,
     private readonly connectionCheckService: ConnectionCheckService,
   ) {}
 
@@ -270,5 +272,21 @@ export class AccountsService {
     await this.accountRepo.save(account);
 
     return result;
+  }
+
+  async listFacebookGroups(accountId: string, userId: string, isAdmin: boolean) {
+    const account = await this.accountRepo.findOne({
+      where: { id: accountId },
+    });
+    if (!account) throw new NotFoundException('Account not found');
+    if (account.type !== 'facebook') {
+      throw new BadRequestException('Akun ini bukan tipe Facebook');
+    }
+
+    if (!isAdmin) {
+      await this.assertHasAccess(accountId, userId);
+    }
+
+    return this.facebookGroupsScraper.listMyGroups(account);
   }
 }

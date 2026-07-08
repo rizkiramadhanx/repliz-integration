@@ -7,6 +7,7 @@ import { AccountsController } from './accounts.controller';
 import { LogsModule } from '../logs/logs.module';
 import { TelegramPublisher } from './publishers/telegram.publisher';
 import { FacebookPublisher } from './publishers/facebook.publisher';
+import { FacebookGroupsScraper } from './publishers/facebook-groups.scraper';
 import { InstagramPublisher } from './publishers/instagram.publisher';
 import { TwitterPublisher } from './publishers/twitter.publisher';
 import { ConnectionCheckService } from './connection-check/connection-check.service';
@@ -23,6 +24,7 @@ import { CookieSessionChecker } from './connection-check/cookie-session.checker'
     AccountsService,
     TelegramPublisher,
     FacebookPublisher,
+    FacebookGroupsScraper,
     InstagramPublisher,
     TwitterPublisher,
     ConnectionCheckService,
