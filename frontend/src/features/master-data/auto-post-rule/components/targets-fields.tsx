@@ -5,6 +5,7 @@ import type {
   typeFacebookPostMode,
 } from "@/features/master-data/auto-post-rule/type";
 import {
+  Button,
   Divider,
   Group,
   Select,
@@ -47,6 +48,14 @@ export default function TargetsFields({
     accounts
       .filter((a) => a.type === type)
       .map((a) => ({ value: a.id, label: a.label }));
+
+  // Saat user paste hasil scrape ("id (nama grup)" per baris) ke TagsInput,
+  // ambil hanya angka ID-nya — nama grup dalam kurung tidak relevan untuk
+  // disimpan sebagai facebookGroupIds.
+  const extractGroupId = (raw: string): string => {
+    const match = raw.trim().match(/^(\d+)/);
+    return match ? match[1] : raw.trim();
+  };
 
   const toggleTarget = (target: typeAutoPostTarget, checked: boolean) => {
     const nextTargets = checked
@@ -104,15 +113,32 @@ export default function TargetsFields({
             ]}
           />
           {value.facebookPostMode === "group" && (
-            <TagsInput
-              label="ID Grup Facebook"
-              description="Tekan Enter untuk menambah ID grup"
-              placeholder="mis. 123456789012345"
-              value={value.facebookGroupIds ?? []}
-              onChange={(val) =>
-                onChange({ ...value, facebookGroupIds: val })
-              }
-            />
+            <Stack gap={4}>
+              <Group justify="space-between">
+                <Text size="sm" fw={500}>
+                  ID Grup Facebook
+                </Text>
+                <Button
+                  size="xs"
+                  variant="subtle"
+                  color="red"
+                  onClick={() => onChange({ ...value, facebookGroupIds: [] })}
+                >
+                  Reset
+                </Button>
+              </Group>
+              <TagsInput
+                placeholder="mis. 123456789012345"
+                splitChars={["\n"]}
+                value={value.facebookGroupIds ?? []}
+                onChange={(val) =>
+                  onChange({
+                    ...value,
+                    facebookGroupIds: val.map(extractGroupId),
+                  })
+                }
+              />
+            </Stack>
           )}
         </>
       )}

@@ -153,7 +153,7 @@ async function fillComposerAndSubmit(
   }
 
   const postButton = dialog
-    .locator('[aria-label="Post"], [aria-label="Kirim"]')
+    .locator('[aria-label="Post"], [aria-label="Kirim"], [aria-label="Posting"]')
     .first();
   await postButton.waitFor({ timeout: 15000 });
   await postButton.click();
@@ -264,16 +264,17 @@ export class FacebookPublisher {
         });
         await page.waitForTimeout(3000);
 
-        // Composer grup memakai region "Write something..."/"Tulis sesuatu..."
-        // (beda dari wall yang aria-label-nya "Create a post"). Selector ini
-        // best-effort — belum ada referensi resmi dari master-scrape untuk grup,
-        // perlu divalidasi manual saat testing nyata.
-        const composerRegion = page
-          .locator(
-            '[aria-label="Write something..."], [aria-label="Tulis sesuatu..."]',
-          )
+        // Composer grup tidak punya aria-label (beda dari wall) — teksnya
+        // "Write something..."/"Tulis sesuatu..." ada di dalam <span> anak,
+        // bukan atribut pada elemen [role="button"] pembungkusnya. Cari lewat
+        // teks lalu klik ancestor [role="button"] terdekat.
+        const composerText = page
+          .getByText(/^(Write something|Tulis sesuatu)/i)
           .first();
-        await composerRegion.waitFor({ timeout: 20000 });
+        await composerText.waitFor({ timeout: 20000 });
+        const composerRegion = composerText.locator(
+          'xpath=ancestor::div[@role="button"][1]',
+        );
         await composerRegion.click();
 
         await fillComposerAndSubmit(page, options);
