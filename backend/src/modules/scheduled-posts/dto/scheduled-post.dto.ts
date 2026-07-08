@@ -44,10 +44,3 @@ export class FindAllScheduledPostsQueryDto extends PaginationDto {
   endDate?: string;
 }
 
-export class GenerateFromLinkDto {
-  @IsUUID()
-  sourceAccountId: string;
-
-  @IsString()
-  sourceUrl: string;
-}

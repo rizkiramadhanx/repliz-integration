@@ -21,7 +21,6 @@ import {
   BulkIdsDto,
   CreateScheduledPostDraftDto,
   FindAllScheduledPostsQueryDto,
-  GenerateFromLinkDto,
   ScheduleDto,
   UpdateScheduledPostDraftDto,
 } from './dto/scheduled-post.dto';
@@ -68,26 +67,6 @@ export class ScheduledPostsController {
       path: `scheduled-post-media/${file.filename}`,
       mediaType: file.mimetype.startsWith('video/') ? 'video' : 'image',
     });
-  }
-
-  @Post('generate-from-link')
-  @Permissions('scheduled-post:create')
-  async generateFromLink(
-    @Body() dto: GenerateFromLinkDto,
-    @Res({ passthrough: true }) res: Response,
-  ) {
-    try {
-      const created = await this.service.generateFromLink(dto);
-      res.status(HttpStatus.CREATED);
-      return createSuccessResponse('Draft berhasil dibuat dari link', created);
-    } catch (err) {
-      console.error('Failed generate from link', err);
-      res.status(HttpStatus.BAD_REQUEST);
-      return createErrorResponse(
-        err instanceof Error ? err.message : 'Gagal generate dari link',
-        HttpStatus.BAD_REQUEST,
-      );
-    }
   }
 
   @Get()

@@ -17,11 +17,7 @@ import { PaginationDto } from '../../common/dto/pagination.dto';
 import { ResponseMeta } from '../../common/type/response';
 import { deleteFile } from '../auto-post-rules/worker/media.util';
 import { SCHEDULED_POST_QUEUE_NAME } from './worker/scheduled-post-queue.constants';
-import {
-  GenerateFromLinkDto,
-  UpdateScheduledPostDraftDto,
-} from './dto/scheduled-post.dto';
-import { scrapeInstagramPostByUrl } from '../auto-post-rules/worker/instagram-scraper.util';
+import { UpdateScheduledPostDraftDto } from './dto/scheduled-post.dto';
 
 const EDITABLE_STATUSES: ScheduledPostStatus[] = ['draft', 'scheduled'];
 
@@ -157,38 +153,6 @@ export class ScheduledPostsService {
       row.isVideo = file.mimetype.startsWith('video/');
     }
 
-    const saved = await this.repo.save(row);
-    return this.serialize(saved);
-  }
-
-  async generateFromLink(dto: GenerateFromLinkDto) {
-    const browsingAccount = await this.accountRepo.findOne({
-      where: { id: dto.sourceAccountId },
-    });
-    if (!browsingAccount) {
-      throw new BadRequestException('Akun browsing tidak ditemukan');
-    }
-
-    const scraped = await scrapeInstagramPostByUrl(
-      browsingAccount,
-      dto.sourceUrl,
-    );
-    if (!scraped) {
-      throw new BadRequestException(
-        'Post tidak ditemukan atau gagal diekstrak medianya',
-      );
-    }
-
-    const row = this.repo.create({
-      sourceAccountId: dto.sourceAccountId,
-      sourceUrl: dto.sourceUrl,
-      caption: scraped.caption,
-      mediaPath: null,
-      thumbnailUrl: scraped.thumbnailUrl,
-      isVideo: scraped.isVideo,
-      targetAccountIds: [],
-      status: 'draft',
-    });
     const saved = await this.repo.save(row);
     return this.serialize(saved);
   }
