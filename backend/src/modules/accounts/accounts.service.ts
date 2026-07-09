@@ -15,6 +15,7 @@ import { ResponseMeta } from '../../common/type/response';
 import { TelegramPublisher } from './publishers/telegram.publisher';
 import { FacebookGroupsScraper } from './publishers/facebook-groups.scraper';
 import { ConnectionCheckService } from './connection-check/connection-check.service';
+import { ConnectionAlertService } from './connection-alert.service';
 
 @Injectable()
 export class AccountsService {
@@ -26,6 +27,7 @@ export class AccountsService {
     private readonly telegramPublisher: TelegramPublisher,
     private readonly facebookGroupsScraper: FacebookGroupsScraper,
     private readonly connectionCheckService: ConnectionCheckService,
+    private readonly connectionAlertService: ConnectionAlertService,
   ) {}
 
   // Hanya URL profil (info publik) yang di-expose ke frontend — cookie/token
@@ -101,7 +103,11 @@ export class AccountsService {
     return this.serialize(saved);
   }
 
-  async listForUser(userId: string, isAdmin: boolean, pagination: PaginationDto) {
+  async listForUser(
+    userId: string,
+    isAdmin: boolean,
+    pagination: PaginationDto,
+  ) {
     const { page = 1, limit = 10 } = pagination;
     const skip = (page - 1) * limit;
 
@@ -304,6 +310,14 @@ export class AccountsService {
     }
   }
 
+  // Kirim ringkasan status seluruh akun ke WA sesuai kondisi saat ini
+  // (tanpa re-check koneksi) — dipicu manual lewat tombol di halaman Account.
+  async sendStatusSummaryToWhatsapp(): Promise<boolean> {
+    const accounts = await this.accountRepo.find();
+    if (accounts.length === 0) return false;
+    return this.connectionAlertService.sendStatusSummary(accounts);
+  }
+
   private async runConnectionCheck(account: AccountEntity) {
     const result = await this.connectionCheckService.check(account);
 
@@ -318,10 +332,21 @@ export class AccountsService {
     }
     await this.accountRepo.save(account);
 
+    await this.connectionAlertService
+      .notifyIfStatusChanged(account, account.connectionStatus)
+      .catch(() => {
+        // Best-effort — kegagalan kirim alert WA tidak boleh menggagalkan
+        // pengecekan koneksi akun itu sendiri.
+      });
+
     return result;
   }
 
-  async listFacebookGroups(accountId: string, userId: string, isAdmin: boolean) {
+  async listFacebookGroups(
+    accountId: string,
+    userId: string,
+    isAdmin: boolean,
+  ) {
     const account = await this.accountRepo.findOne({
       where: { id: accountId },
     });

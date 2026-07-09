@@ -14,11 +14,15 @@ import { TwitterPublisher } from './publishers/twitter.publisher';
 import { ConnectionCheckService } from './connection-check/connection-check.service';
 import { DiscordChecker } from './connection-check/discord.checker';
 import { CookieSessionChecker } from './connection-check/cookie-session.checker';
+import { ConnectionAlertService } from './connection-alert.service';
+import { WhatsappModule } from '../whatsapp/whatsapp.module';
+import { redisClientProvider } from '../../config/redis-client.provider';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([AccountEntity, AccountDelegationEntity]),
     LogsModule,
+    WhatsappModule,
   ],
   controllers: [AccountsController],
   providers: [
@@ -32,6 +36,8 @@ import { CookieSessionChecker } from './connection-check/cookie-session.checker'
     ConnectionCheckService,
     DiscordChecker,
     CookieSessionChecker,
+    ConnectionAlertService,
+    redisClientProvider,
   ],
   exports: [
     AccountsService,
