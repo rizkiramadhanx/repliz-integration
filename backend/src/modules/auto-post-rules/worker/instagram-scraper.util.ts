@@ -254,6 +254,8 @@ function requireCookies(browsingAccount: AccountEntity): RawSessionCookie[] {
   return cookies;
 }
 
+const SESSION_HARD_TIMEOUT_MS = 3 * 60 * 1000;
+
 async function withInstagramSession<T>(
   browsingAccount: AccountEntity,
   run: (page: Page) => Promise<T>,
@@ -265,18 +267,33 @@ async function withInstagramSession<T>(
     args: ['--no-sandbox', '--disable-dev-shm-usage'],
   });
 
+  // Guard keras: kalau `run()` hang (mis. loop scroll/scrape yang tidak
+  // pernah selesai walau tiap operasi individualnya sudah punya timeout
+  // sendiri), `finally` di bawah tidak akan tereksekusi sampai `run()`
+  // settle — browser jadi menggantung selamanya dan proses Chromium-nya
+  // nge-leak. Race dengan deadline eksplisit supaya browser tetap dipaksa
+  // close walau `run()` belum selesai.
+  let deadlineTimer: NodeJS.Timeout;
+  const deadline = new Promise<never>((_, reject) => {
+    deadlineTimer = setTimeout(
+      () => reject(new Error('Sesi scraping Instagram timeout (melebihi 3 menit)')),
+      SESSION_HARD_TIMEOUT_MS,
+    );
+  });
+
   try {
     const context = await browser.newContext({ userAgent: USER_AGENT });
     await context.addCookies(toPlaywrightCookies(cookies));
 
     const page = await context.newPage();
     try {
-      return await run(page);
+      return await Promise.race([run(page), deadline]);
     } finally {
-      await page.close();
+      clearTimeout(deadlineTimer!);
+      await page.close().catch(() => undefined);
     }
   } finally {
-    await browser.close();
+    await browser.close().catch(() => undefined);
   }
 }
 
