@@ -13,10 +13,11 @@ import {
   Stack,
   Table,
   Text,
+  TextInput,
 } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
-import { useState } from "react";
-import { MdOutlineClose } from "react-icons/md";
+import { useMemo, useState } from "react";
+import { MdOutlineClose, MdSearch } from "react-icons/md";
 
 export default function ModalScrapeGroupFacebook({
   open,
@@ -28,6 +29,7 @@ export default function ModalScrapeGroupFacebook({
   const [accountId, setAccountId] = useState<string | null>(null);
   const [groups, setGroups] = useState<typeFacebookGroup[]>([]);
   const [checkedIds, setCheckedIds] = useState<string[]>([]);
+  const [search, setSearch] = useState("");
 
   const { data: accountData } = useGetAllAccount({ page: 1, limit: 100 });
   const facebookAccounts: typeDataAccount[] = (
@@ -72,6 +74,7 @@ export default function ModalScrapeGroupFacebook({
     setAccountId(null);
     setGroups([]);
     setCheckedIds([]);
+    setSearch("");
     onClose();
   };
 
@@ -81,11 +84,27 @@ export default function ModalScrapeGroupFacebook({
     );
   };
 
-  const allChecked = groups.length > 0 && checkedIds.length === groups.length;
-  const someChecked = checkedIds.length > 0 && !allChecked;
+  const filteredGroups = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return groups;
+    return groups.filter(
+      (g) => g.name.toLowerCase().includes(q) || g.id.includes(q),
+    );
+  }, [groups, search]);
+
+  const allChecked =
+    filteredGroups.length > 0 &&
+    filteredGroups.every((g) => checkedIds.includes(g.id));
+  const someChecked =
+    filteredGroups.some((g) => checkedIds.includes(g.id)) && !allChecked;
 
   const toggleCheckAll = () => {
-    setCheckedIds(allChecked ? [] : groups.map((g) => g.id));
+    const filteredIds = filteredGroups.map((g) => g.id);
+    setCheckedIds((prev) =>
+      allChecked
+        ? prev.filter((id) => !filteredIds.includes(id))
+        : Array.from(new Set([...prev, ...filteredIds])),
+    );
   };
 
   const checkedGroups = groups.filter((g) => checkedIds.includes(g.id));
@@ -141,6 +160,12 @@ export default function ModalScrapeGroupFacebook({
                 )}
               </CopyButton>
             </Group>
+            <TextInput
+              placeholder="Cari nama atau ID grup..."
+              leftSection={<MdSearch />}
+              value={search}
+              onChange={(e) => setSearch(e.currentTarget.value)}
+            />
             <Table.ScrollContainer minWidth={200} maxHeight={400}>
               <Table striped highlightOnHover>
                 <Table.Thead>
@@ -157,7 +182,16 @@ export default function ModalScrapeGroupFacebook({
                   </Table.Tr>
                 </Table.Thead>
                 <Table.Tbody>
-                  {groups.map((g) => (
+                  {filteredGroups.length === 0 && (
+                    <Table.Tr>
+                      <Table.Td colSpan={3}>
+                        <Text size="sm" c="dimmed" ta="center" py="sm">
+                          Tidak ada grup yang cocok
+                        </Text>
+                      </Table.Td>
+                    </Table.Tr>
+                  )}
+                  {filteredGroups.map((g) => (
                     <Table.Tr key={g.id}>
                       <Table.Td>
                         <Checkbox

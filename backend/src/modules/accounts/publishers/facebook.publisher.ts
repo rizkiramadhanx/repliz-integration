@@ -165,6 +165,23 @@ async function fillComposerAndSubmit(
     .waitFor({ state: 'detached', timeout: isVideo ? 120000 : 30000 })
     .catch(() => {});
   await page.waitForTimeout(2000);
+
+  // Facebook kadang menolak post lewat banner rate-limit ("We limit how
+  // often you can post..." / "Kami membatasi seberapa sering Anda dapat
+  // memposting...", tergantung locale akun) alih-alih menutup dialog dengan
+  // error biasa — tanpa cek ini, klik "Post" di atas dianggap sukses walau
+  // postingan sebenarnya ditolak karena spam protection.
+  const rateLimitBanner = page
+    .getByText(
+      /we limit how often you can post, comment or do other things|kami membatasi seberapa sering anda dapat memposting/i,
+    )
+    .first();
+  const isRateLimited = await rateLimitBanner.isVisible().catch(() => false);
+  if (isRateLimited) {
+    throw new Error(
+      'We limit how often you can post, comment or do other things in a given amount of time in order to help protect the community from spam.',
+    );
+  }
 }
 
 @Injectable()

@@ -18,6 +18,20 @@ export interface BlastJobData {
   blastJobId: string;
 }
 
+// Pesan rate-limit Facebook — muncul dalam bahasa Inggris ("We limit how
+// often you can post, comment or do other things...") atau Indonesia
+// ("Kami membatasi seberapa sering Anda dapat memposting...") tergantung
+// locale akun. Kalau ini muncul, akun sedang kena spam-limit dan lanjut
+// posting ke grup berikutnya cuma akan gagal terus + berisiko akun kena
+// flag lebih parah. Blast harus berhenti total, bukan lanjut ke grup
+// berikutnya seperti kegagalan biasa (mis. grup tidak ditemukan).
+const FACEBOOK_RATE_LIMIT_PATTERN =
+  /we limit how often you can post, comment or do other things|kami membatasi seberapa sering anda dapat memposting/i;
+
+function isFacebookRateLimitError(message: string | null): boolean {
+  return !!message && FACEBOOK_RATE_LIMIT_PATTERN.test(message);
+}
+
 @Processor(BLAST_QUEUE_NAME, { concurrency: 1 })
 export class BlastProcessor extends WorkerHost {
   private readonly logger = new Logger(BlastProcessor.name);
@@ -136,20 +150,34 @@ export class BlastProcessor extends WorkerHost {
       errorMessage: resultError,
     });
 
+    const rateLimited = isFacebookRateLimitError(resultError);
+
     const nextIndex = blast.currentGroupIndex + 1;
     const isDone = nextIndex >= blast.groupIds.length;
-    const nextStatus = isDone ? 'completed' : 'running';
+    const nextStatus = rateLimited ? 'failed' : isDone ? 'completed' : 'running';
+    const nextErrorMessage = rateLimited
+      ? 'Blast dihentikan otomatis: akun Facebook kena rate limit (spam protection). Coba lagi nanti.'
+      : null;
 
     await this.blastRepo.update(blast.id, {
       currentGroupIndex: nextIndex,
       status: nextStatus,
+      errorMessage: nextErrorMessage,
     });
     this.emitProgress(
       blast.id,
       nextIndex,
       blast.groupIds.length,
       nextStatus,
+      nextErrorMessage ?? undefined,
     );
+
+    if (rateLimited) {
+      this.logger.warn(
+        `Blast job ${blast.id} dihentikan otomatis karena rate limit Facebook`,
+      );
+      return;
+    }
 
     if (!isDone) {
       // Re-check status TERBARU dari DB (bukan variable `blast` di tangan) —
