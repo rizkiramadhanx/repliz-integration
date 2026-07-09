@@ -6,6 +6,7 @@ import ModalManageDelegations from "@/features/master-data/account/components/mo
 import useGetAllAccount from "@/features/master-data/account/hooks/useGetAllAccount";
 import useMutateCheckConnection from "@/features/master-data/account/hooks/useMutateCheckConnection";
 import useMutateDeleteAccount from "@/features/master-data/account/hooks/useMutateDeleteAccount";
+import useMutateSendStatusWhatsapp from "@/features/master-data/account/hooks/useMutateSendStatusWhatsapp";
 import type { typeDataAccount } from "@/features/master-data/account/type";
 import { useDebounceCallback } from "@/hooks/useDebounceCallback";
 import dayjs from "@/libs/dayjs";
@@ -25,6 +26,7 @@ import { notifications } from "@mantine/notifications";
 import { useState } from "react";
 import { CiSearch } from "react-icons/ci";
 import { TiArrowBack } from "react-icons/ti";
+import { IoLogoWhatsapp } from "react-icons/io";
 import { useNavigate } from "react-router";
 
 const CONNECTION_STATUS_COLOR: Record<string, string> = {
@@ -147,6 +149,29 @@ export default function PageAccount() {
     });
   };
 
+  const { mutate: sendStatusWhatsapp, isPending: isSendingStatusWhatsapp } =
+    useMutateSendStatusWhatsapp();
+
+  const handleSendStatusWhatsapp = () => {
+    sendStatusWhatsapp(undefined, {
+      onSuccess: (res) => {
+        notifications.show({
+          title: res.data.sent ? "Sukses" : "Dilewati",
+          message: res.data.sent
+            ? "Ringkasan status akun terkirim ke WhatsApp"
+            : "Nomor tujuan WA belum dikonfigurasi di server",
+          color: res.data.sent ? "green" : "yellow",
+        });
+      },
+      onError: (err: unknown) => {
+        const axErr = err as { response?: { data?: { message?: string } } };
+        const msg =
+          axErr?.response?.data?.message ?? "Gagal mengirim status ke WhatsApp";
+        notifications.show({ title: "Error", message: msg, color: "red" });
+      },
+    });
+  };
+
   const accounts = dataAccount?.data?.data ?? [];
   const meta = dataAccount?.data?.meta;
   const totalPages = meta?.total_page ?? 0;
@@ -171,15 +196,29 @@ export default function PageAccount() {
         mt={10}
         sx={{ justifyContent: "space-between", alignItems: "center" }}
       >
-        <Button
-          w={{ base: "100%", md: "auto" }}
-          onClick={() => setOpenAdd(true)}
-          sx={{ marginTop: 1 }}
-          color="primary"
-          size="sm"
-        >
-          Tambah Account
-        </Button>
+        <Group gap={10} wrap="wrap">
+          <Button
+            w={{ base: "100%", md: "auto" }}
+            onClick={() => setOpenAdd(true)}
+            sx={{ marginTop: 1 }}
+            color="primary"
+            size="sm"
+          >
+            Tambah Account
+          </Button>
+          <Tooltip label="Kirim ringkasan status semua akun ke WhatsApp">
+            <Button
+              w={{ base: "100%", md: "auto" }}
+              onClick={handleSendStatusWhatsapp}
+              loading={isSendingStatusWhatsapp}
+              color="green"
+              size="sm"
+              leftSection={<IoLogoWhatsapp size={16} />}
+            >
+              Kirim Status
+            </Button>
+          </Tooltip>
+        </Group>
         <Input
           size="sm"
           leftSection={<CiSearch size={18} />}

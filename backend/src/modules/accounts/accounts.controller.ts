@@ -408,4 +408,26 @@ export class AccountsController {
       );
     }
   }
+
+  @Post('send-status-whatsapp')
+  @Permissions('account:read')
+  async sendStatusWhatsapp(@Res({ passthrough: true }) res: Response) {
+    try {
+      const sent = await this.accountsService.sendStatusSummaryToWhatsapp();
+      res.status(HttpStatus.OK);
+      return createSuccessResponse(
+        sent ? 'Ringkasan status terkirim ke WhatsApp' : 'Pengiriman dilewati',
+        { sent },
+      );
+    } catch (err) {
+      console.error('Failed send status summary to whatsapp', err);
+      res.status(HttpStatus.BAD_REQUEST);
+      return createErrorResponse(
+        err instanceof Error
+          ? err.message
+          : 'Failed to send status summary to whatsapp',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+  }
 }
