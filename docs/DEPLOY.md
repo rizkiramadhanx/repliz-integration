@@ -90,7 +90,7 @@ openssl rand -base64 48   # jalankan 2x, untuk JWT_SECRET & JWT_SECRET_REFRESH
 | `REPLIZ_ACCESS_KEY` | Dari Dashboard Repliz → Settings → API |
 | `REPLIZ_SECRET_KEY` | idem |
 | `REPLIZ_BASE_URL` | Opsional, default `https://api.repliz.com` |
-| `PUBLIC_BASE_URL` | **Opsional** — default otomatis ke `https://${BACKEND_DOMAIN}` |
+| `PUBLIC_BASE_URL` | **Opsional** — default otomatis ke `https://${BACKEND_DOMAIN}`. **Jangan tulis port** (lihat catatan di bawah) |
 | `SCRAPE_BROWSING_ACCOUNT_ID` | Opsional — UUID akun pemantau (x). Kosong = pakai akun Instagram pertama |
 
 > **`PUBLIC_BASE_URL` tidak perlu diisi manual saat deploy.** Nilainya
@@ -98,6 +98,14 @@ openssl rand -base64 48   # jalankan 2x, untuk JWT_SECRET & JWT_SECRET_REFRESH
 > diakses dari internet**, karena **server Repliz** yang mengunduh file
 > media — bukan browser pengguna. `localhost` akan ditolak sistem dengan
 > pesan eksplisit.
+>
+> **Jangan pernah menulis port aplikasi di URL https**, mis.
+> `https://api.domain.com:4000`. TLS diterminasi Traefik di port **443**,
+> sedangkan port 4000 melayani **HTTP polos** — mengaksesnya lewat https
+> menghasilkan `ERR_SSL_PROTOCOL_ERROR` dan media gagal diunduh Repliz.
+> Yang benar cukup `https://api.domain.com` (tanpa port). Sistem menolak
+> kombinasi ini saat validasi dan otomatis membuang portnya saat menyusun
+> URL media.
 
 ### Opsional — email alert
 
@@ -232,6 +240,7 @@ docker logs -f traefik-manual-traefik-1     # routing & TLS
 | Sertifikat TLS tidak terbit | DNS belum propagasi, atau port 80 tertutup (Let's Encrypt pakai HTTP challenge) |
 | `PUBLIC_BASE_URL ... mengarah ke localhost` | Isi `BACKEND_DOMAIN` dengan domain publik, bukan localhost |
 | Sinkronisasi gagal unduh media | Cek `https://api.domain.com/uploads/` bisa diakses dari luar VPS |
+| `ERR_SSL_PROTOCOL_ERROR` pada URL media | `PUBLIC_BASE_URL` memakai https + port aplikasi (mis. `:4000`). Hapus portnya — TLS ada di 443 lewat Traefik |
 | Menu baru tidak muncul di sidebar | Logout–login ulang; permission disimpan di sesi saat login |
 | Scrape gagal / akun terputus | Cookies akun pemantau kedaluwarsa — perbarui lewat menu Account |
 | Backend/DB tiba-tiba mati, log Postgres `No space left on device` | Disk penuh — lihat [Pemeliharaan disk](#pemeliharaan-disk) |

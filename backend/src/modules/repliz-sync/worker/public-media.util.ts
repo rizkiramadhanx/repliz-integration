@@ -37,7 +37,26 @@ export function buildPublicUrl(publicPath: string): string {
       'PUBLIC_BASE_URL belum dikonfigurasi — server Repliz butuh URL media yang bisa diakses dari internet',
     );
   }
-  return `${baseUrl.replace(/\/+$/, '')}/${publicPath.replace(/^\/+/, '')}`;
+  return `${normalizePublicBaseUrl(baseUrl)}/${publicPath.replace(/^\/+/, '')}`;
+}
+
+// Membuang port dari URL https. Traefik menerima TLS di 443 lalu meneruskan
+// ke port aplikasi di jaringan internal, sehingga port aplikasi tidak boleh
+// muncul di URL publik. Dipakai juga saat menyusun URL agar salah konfigurasi
+// pada instalasi lama tidak menghasilkan link yang rusak permanen.
+export function normalizePublicBaseUrl(baseUrl: string): string {
+  const trimmed = baseUrl.replace(/\/+$/, '');
+  try {
+    const parsed = new URL(trimmed);
+    if (parsed.protocol === 'https:' && parsed.port && parsed.port !== '443') {
+      parsed.port = '';
+      return parsed.toString().replace(/\/+$/, '');
+    }
+  } catch {
+    // Bukan URL valid — biarkan apa adanya, assertPublicBaseUrlUsable yang
+    // akan menolaknya dengan pesan jelas sebelum dipakai.
+  }
+  return trimmed;
 }
 
 export function assertPublicBaseUrlUsable(): void {
@@ -50,6 +69,26 @@ export function assertPublicBaseUrlUsable(): void {
   if (/localhost|127\.0\.0\.1|0\.0\.0\.0/i.test(baseUrl)) {
     throw new Error(
       `PUBLIC_BASE_URL (${baseUrl}) mengarah ke localhost — server Repliz tidak bisa mengunduh media dari sana. Pakai domain publik atau tunnel.`,
+    );
+  }
+
+  let parsed: URL;
+  try {
+    parsed = new URL(baseUrl);
+  } catch {
+    throw new Error(
+      `PUBLIC_BASE_URL (${baseUrl}) bukan URL yang valid — contoh benar: https://api.domain.com`,
+    );
+  }
+
+  // https + port aplikasi adalah kombinasi yang mustahil: TLS diterminasi
+  // Traefik di 443, sedangkan port aplikasi (4000) bicara HTTP polos. URL
+  // seperti https://domain.com:4000 menghasilkan ERR_SSL_PROTOCOL_ERROR di
+  // browser dan gagal diunduh server Repliz — tanpa cek ini, kegagalannya
+  // baru terlihat setelah jadwal terlanjur dibuat.
+  if (parsed.protocol === 'https:' && parsed.port && parsed.port !== '443') {
+    throw new Error(
+      `PUBLIC_BASE_URL (${baseUrl}) memakai https dengan port ${parsed.port}. TLS diterminasi di port 443 oleh Traefik, sedangkan port ${parsed.port} melayani HTTP polos — akses https ke port itu gagal dengan SSL protocol error. Hapus portnya: ${parsed.protocol}//${parsed.hostname}`,
     );
   }
 }
