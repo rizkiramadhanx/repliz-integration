@@ -5,6 +5,7 @@ import { BiUser } from "react-icons/bi";
 import { FaDatabase } from "react-icons/fa";
 import { HiShieldCheck } from "react-icons/hi";
 import { MdHelpOutline } from "react-icons/md";
+import { TbBrandCampaignmonitor } from "react-icons/tb";
 import { FaUserShield } from "react-icons/fa6";
 
 export type SidebarMenuChild = {
@@ -47,6 +48,12 @@ const SidebarMenu: SidebarMenuItem[] = [
     icon: <FaUserShield />,
     path: ROUTES.MasterData.Account.View,
     modules: [MODULE_LIST.MasterData.Account.Read],
+  },
+  {
+    title: "Repliz",
+    icon: <TbBrandCampaignmonitor />,
+    path: ROUTES.Repliz.View,
+    modules: [MODULE_LIST.Repliz.Read],
   },
   {
     title: "Panduan",

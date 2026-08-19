@@ -14,6 +14,9 @@ export const ROUTES = {
       View: "/master-data/account",
     },
   },
+  Repliz: {
+    View: "/repliz",
+  },
   Guide: {
     View: "/guide",
   },

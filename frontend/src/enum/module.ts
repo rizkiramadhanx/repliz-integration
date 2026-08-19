@@ -19,4 +19,7 @@ export const MODULE_LIST = {
       Delete: "account:delete",
     },
   },
+  Repliz: {
+    Read: "repliz:read",
+  },
 };

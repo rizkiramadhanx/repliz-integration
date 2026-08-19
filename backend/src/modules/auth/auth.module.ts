@@ -13,6 +13,7 @@ import config from './../../config/jwt.config';
 import { DatabaseModule } from './../../database/database.module';
 import databaseConfig from './../../config/database.config';
 import redisConfig from './../../config/redis.config';
+import replizConfig from './../../config/repliz.config';
 import { MailService } from '../mailer/mailer.service';
 import { MailModule } from '../mailer/mailer.module';
 import { LogsModule } from '../logs/logs.module';
@@ -26,7 +27,7 @@ import { LogsModule } from '../logs/logs.module';
     TypeOrmModule.forFeature([UserEntity, RoleEntity]),
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [databaseConfig, redisConfig],
+      load: [databaseConfig, redisConfig, replizConfig],
     }),
     ConfigModule.forFeature(config),
     JwtModule.registerAsync({

@@ -23,28 +23,8 @@ const ACTION_ROLES = [
     ],
   },
   {
-    name: 'auto-post-rule',
-    actions: [
-      'auto-post-rule:create',
-      'auto-post-rule:read',
-      'auto-post-rule:update',
-      'auto-post-rule:delete',
-      'auto-post-rule:run',
-    ],
-  },
-  {
-    name: 'post-history',
-    actions: ['post-history:read'],
-  },
-  {
-    name: 'scheduled-post',
-    actions: [
-      'scheduled-post:create',
-      'scheduled-post:read',
-      'scheduled-post:update',
-      'scheduled-post:delete',
-      'scheduled-post:run',
-    ],
+    name: 'repliz',
+    actions: ['repliz:read'],
   },
 ];
 

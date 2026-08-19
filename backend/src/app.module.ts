@@ -13,6 +13,7 @@ import { APP_INTERCEPTOR } from '@nestjs/core';
 import { MailModule } from './modules/mailer/mailer.module';
 import { LogsModule } from './modules/logs/logs.module';
 import { AccountsModule } from './modules/accounts/accounts.module';
+import { ReplizModule } from './modules/repliz/repliz.module';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { AccountsModule } from './modules/accounts/accounts.module';
     MailModule,
     RolesModule,
     AccountsModule,
+    ReplizModule,
   ],
   controllers: [AppController],
   providers: [

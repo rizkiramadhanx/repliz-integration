@@ -22,15 +22,7 @@ const ROLES: { name: string; actions: string[] }[] = [
       'account:create',
       'account:read',
       'account:update',
-      'auto-post-rule:create',
-      'auto-post-rule:read',
-      'auto-post-rule:update',
-      'auto-post-rule:run',
-      'post-history:read',
-      'scheduled-post:create',
-      'scheduled-post:read',
-      'scheduled-post:update',
-      'scheduled-post:run',
+      'repliz:read',
     ],
   },
   {
@@ -38,9 +30,7 @@ const ROLES: { name: string; actions: string[] }[] = [
     name: 'Operator',
     actions: [
       'account:read',
-      'auto-post-rule:read',
-      'post-history:read',
-      'scheduled-post:read',
+      'repliz:read',
     ],
   },
 ];
