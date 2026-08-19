@@ -53,11 +53,7 @@ services:
       MAIL_USER: ${MAIL_USER:-}
       MAIL_PASS: ${MAIL_PASS:-}
       MAIL_FROM: ${MAIL_FROM:-}
-      WA_BASE_URL: ${WA_BASE_URL:-}
-      WA_BASIC_AUTH_USER: ${WA_BASIC_AUTH_USER:-}
-      WA_BASIC_AUTH_PASS: ${WA_BASIC_AUTH_PASS:-}
-      WA_DEVICE_ID: ${WA_DEVICE_ID:-}
-      WA_ALERT_TARGET_PHONE: ${WA_ALERT_TARGET_PHONE:-}
+      ALERT_TARGET_EMAIL: ${ALERT_TARGET_EMAIL:-}
     volumes:
       - app_uploads:/usr/src/app/uploads
     depends_on:

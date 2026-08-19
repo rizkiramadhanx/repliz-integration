@@ -6,7 +6,7 @@ import ModalManageDelegations from "@/features/master-data/account/components/mo
 import useGetAllAccount from "@/features/master-data/account/hooks/useGetAllAccount";
 import useMutateCheckConnection from "@/features/master-data/account/hooks/useMutateCheckConnection";
 import useMutateDeleteAccount from "@/features/master-data/account/hooks/useMutateDeleteAccount";
-import useMutateSendStatusWhatsapp from "@/features/master-data/account/hooks/useMutateSendStatusWhatsapp";
+import useMutateSendStatusEmail from "@/features/master-data/account/hooks/useMutateSendStatusEmail";
 import type { typeDataAccount } from "@/features/master-data/account/type";
 import { useDebounceCallback } from "@/hooks/useDebounceCallback";
 import dayjs from "@/libs/dayjs";
@@ -26,7 +26,7 @@ import { notifications } from "@mantine/notifications";
 import { useState } from "react";
 import { CiSearch } from "react-icons/ci";
 import { TiArrowBack } from "react-icons/ti";
-import { IoLogoWhatsapp } from "react-icons/io";
+import { MdOutlineEmail } from "react-icons/md";
 import { useNavigate } from "react-router";
 
 const CONNECTION_STATUS_COLOR: Record<string, string> = {
@@ -149,24 +149,24 @@ export default function PageAccount() {
     });
   };
 
-  const { mutate: sendStatusWhatsapp, isPending: isSendingStatusWhatsapp } =
-    useMutateSendStatusWhatsapp();
+  const { mutate: sendStatusEmail, isPending: isSendingStatusEmail } =
+    useMutateSendStatusEmail();
 
-  const handleSendStatusWhatsapp = () => {
-    sendStatusWhatsapp(undefined, {
+  const handleSendStatusEmail = () => {
+    sendStatusEmail(undefined, {
       onSuccess: (res) => {
         notifications.show({
           title: res.data.sent ? "Sukses" : "Dilewati",
           message: res.data.sent
-            ? "Ringkasan status akun terkirim ke WhatsApp"
-            : "Nomor tujuan WA belum dikonfigurasi di server",
+            ? "Ringkasan status akun terkirim ke email"
+            : "Email tujuan belum dikonfigurasi di server",
           color: res.data.sent ? "green" : "yellow",
         });
       },
       onError: (err: unknown) => {
         const axErr = err as { response?: { data?: { message?: string } } };
         const msg =
-          axErr?.response?.data?.message ?? "Gagal mengirim status ke WhatsApp";
+          axErr?.response?.data?.message ?? "Gagal mengirim status ke email";
         notifications.show({ title: "Error", message: msg, color: "red" });
       },
     });
@@ -206,14 +206,14 @@ export default function PageAccount() {
           >
             Tambah Account
           </Button>
-          <Tooltip label="Kirim ringkasan status semua akun ke WhatsApp">
+          <Tooltip label="Kirim ringkasan status semua akun ke email">
             <Button
               w={{ base: "100%", md: "auto" }}
-              onClick={handleSendStatusWhatsapp}
-              loading={isSendingStatusWhatsapp}
-              color="green"
+              onClick={handleSendStatusEmail}
+              loading={isSendingStatusEmail}
+              color="blue"
               size="sm"
-              leftSection={<IoLogoWhatsapp size={16} />}
+              leftSection={<MdOutlineEmail size={16} />}
             >
               Kirim Status
             </Button>

@@ -409,23 +409,23 @@ export class AccountsController {
     }
   }
 
-  @Post('send-status-whatsapp')
+  @Post('send-status-email')
   @Permissions('account:read')
-  async sendStatusWhatsapp(@Res({ passthrough: true }) res: Response) {
+  async sendStatusEmail(@Res({ passthrough: true }) res: Response) {
     try {
-      const sent = await this.accountsService.sendStatusSummaryToWhatsapp();
+      const sent = await this.accountsService.sendStatusSummaryToEmail();
       res.status(HttpStatus.OK);
       return createSuccessResponse(
-        sent ? 'Ringkasan status terkirim ke WhatsApp' : 'Pengiriman dilewati',
+        sent ? 'Ringkasan status terkirim ke email' : 'Pengiriman dilewati',
         { sent },
       );
     } catch (err) {
-      console.error('Failed send status summary to whatsapp', err);
+      console.error('Failed send status summary to email', err);
       res.status(HttpStatus.BAD_REQUEST);
       return createErrorResponse(
         err instanceof Error
           ? err.message
-          : 'Failed to send status summary to whatsapp',
+          : 'Failed to send status summary to email',
         HttpStatus.BAD_REQUEST,
       );
     }

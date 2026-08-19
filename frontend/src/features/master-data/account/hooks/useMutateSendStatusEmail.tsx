@@ -1,19 +1,19 @@
 import { axiosInstanceAPI } from "@/libs/axios";
 import { useMutation } from "@tanstack/react-query";
 
-type typeDataSendStatusWhatsappResponse = {
+type typeDataSendStatusEmailResponse = {
   data: {
     sent: boolean;
   };
 };
 
-export default function useMutateSendStatusWhatsapp() {
+export default function useMutateSendStatusEmail() {
   return useMutation({
     mutationFn: async () => {
       const response =
-        await axiosInstanceAPI.request<typeDataSendStatusWhatsappResponse>({
+        await axiosInstanceAPI.request<typeDataSendStatusEmailResponse>({
           method: "POST",
-          url: `/api/account/send-status-whatsapp`,
+          url: `/api/account/send-status-email`,
         });
       return response.data;
     },

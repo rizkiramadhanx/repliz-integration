@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="id">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{title}}</title>
+  </head>
+  <body style="margin:0;padding:0;background-color:#f4f5f7;font-family:Arial,Helvetica,sans-serif;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f5f7;padding:24px 12px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background-color:#ffffff;border-radius:8px;border:1px solid #e3e5e8;">
+            <tr>
+              <td style="padding:20px 24px;border-bottom:1px solid #e3e5e8;">
+                <h1 style="margin:0;font-size:18px;line-height:1.4;color:#1a1c1e;">{{title}}</h1>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:20px 24px;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                  {{#each lines}}
+                  <tr>
+                    <td style="padding:6px 0;font-size:14px;line-height:1.5;color:#3c4043;border-bottom:1px solid #f0f1f3;">{{this}}</td>
+                  </tr>
+                  {{/each}}
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:14px 24px 20px;font-size:12px;color:#6b7280;">
+                Dicek pada: {{checkedAt}}
+              </td>
+            </tr>
+          </table>
+          <p style="margin:16px 0 0;font-size:11px;color:#9aa0a6;">Email otomatis dari Ternak Sosmed — tidak perlu dibalas.</p>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

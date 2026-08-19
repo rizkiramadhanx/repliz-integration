@@ -310,9 +310,9 @@ export class AccountsService {
     }
   }
 
-  // Kirim ringkasan status seluruh akun ke WA sesuai kondisi saat ini
+  // Kirim ringkasan status seluruh akun ke email sesuai kondisi saat ini
   // (tanpa re-check koneksi) — dipicu manual lewat tombol di halaman Account.
-  async sendStatusSummaryToWhatsapp(): Promise<boolean> {
+  async sendStatusSummaryToEmail(): Promise<boolean> {
     const accounts = await this.accountRepo.find();
     if (accounts.length === 0) return false;
     return this.connectionAlertService.sendStatusSummary(accounts);

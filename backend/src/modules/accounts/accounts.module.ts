@@ -15,14 +15,14 @@ import { ConnectionCheckService } from './connection-check/connection-check.serv
 import { DiscordChecker } from './connection-check/discord.checker';
 import { CookieSessionChecker } from './connection-check/cookie-session.checker';
 import { ConnectionAlertService } from './connection-alert.service';
-import { WhatsappModule } from '../whatsapp/whatsapp.module';
+import { MailModule } from '../mailer/mailer.module';
 import { redisClientProvider } from '../../config/redis-client.provider';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([AccountEntity, AccountDelegationEntity]),
     LogsModule,
-    WhatsappModule,
+    MailModule,
   ],
   controllers: [AccountsController],
   providers: [
