@@ -1,7 +1,10 @@
 import useGetAllReplizAccount from "@/features/repliz/hooks/useGetAllReplizAccount";
+import { buildProfileUrl } from "@/features/repliz/profile-url";
 import { useDebounceCallback } from "@/hooks/useDebounceCallback";
 import dayjs from "@/libs/dayjs";
 import {
+  ActionIcon,
+  Anchor,
   Avatar,
   Badge,
   Box,
@@ -12,9 +15,11 @@ import {
   Pagination,
   Table,
   Text,
+  Tooltip,
 } from "@mantine/core";
 import { useState } from "react";
 import { CiSearch } from "react-icons/ci";
+import { MdOpenInNew } from "react-icons/md";
 import { TiArrowBack } from "react-icons/ti";
 import { useNavigate } from "react-router";
 
@@ -102,12 +107,13 @@ export default function PageRepliz() {
                 <Table.Th>Status</Table.Th>
                 <Table.Th>Account ID</Table.Th>
                 <Table.Th>Terhubung Sejak</Table.Th>
+                <Table.Th ta="center">Aksi</Table.Th>
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
               {isLoading && (
                 <Table.Tr>
-                  <Table.Td colSpan={6}>
+                  <Table.Td colSpan={7}>
                     <Text ta="center" c="dimmed" py={20}>
                       Memuat…
                     </Text>
@@ -117,7 +123,7 @@ export default function PageRepliz() {
 
               {!isLoading && isError && (
                 <Table.Tr>
-                  <Table.Td colSpan={6}>
+                  <Table.Td colSpan={7}>
                     <Text ta="center" c="red" py={20}>
                       {errorMessage}
                     </Text>
@@ -127,7 +133,7 @@ export default function PageRepliz() {
 
               {!isLoading && !isError && accounts.length === 0 && (
                 <Table.Tr>
-                  <Table.Td colSpan={6}>
+                  <Table.Td colSpan={7}>
                     <Text ta="center" c="dimmed" py={20}>
                       Belum ada akun terhubung di Repliz
                     </Text>
@@ -137,7 +143,10 @@ export default function PageRepliz() {
 
               {!isLoading &&
                 !isError &&
-                accounts.map((account) => (
+                accounts.map((account) => {
+                  const profileUrl = buildProfileUrl(account);
+
+                  return (
                   <Table.Tr key={account.id ?? account._id}>
                     <Table.Td>
                       <Group gap={10} wrap="nowrap">
@@ -146,11 +155,29 @@ export default function PageRepliz() {
                           alt={account.name}
                           radius="xl"
                           size={32}
+                          component={profileUrl ? "a" : undefined}
+                          href={profileUrl ?? undefined}
+                          target={profileUrl ? "_blank" : undefined}
+                          rel={profileUrl ? "noopener noreferrer" : undefined}
+                          sx={profileUrl ? { cursor: "pointer" } : undefined}
                         />
                         <Text size="sm">{account.name}</Text>
                       </Group>
                     </Table.Td>
-                    <Table.Td>@{account.username}</Table.Td>
+                    <Table.Td>
+                      {profileUrl ? (
+                        <Anchor
+                          href={profileUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          size="sm"
+                        >
+                          @{account.username}
+                        </Anchor>
+                      ) : (
+                        <Text size="sm">@{account.username}</Text>
+                      )}
+                    </Table.Td>
                     <Table.Td>
                       <Badge
                         color={PLATFORM_COLOR[account.type] ?? "gray"}
@@ -177,8 +204,31 @@ export default function PageRepliz() {
                         ? dayjs(account.createdAt).format("DD MMM YYYY HH:mm")
                         : "-"}
                     </Table.Td>
+                    <Table.Td ta="center">
+                      <Tooltip
+                        label={
+                          profileUrl
+                            ? "Buka profil di tab baru"
+                            : `Platform ${account.type} belum didukung`
+                        }
+                      >
+                        <ActionIcon
+                          variant="light"
+                          color="primary"
+                          disabled={!profileUrl}
+                          component={profileUrl ? "a" : "button"}
+                          href={profileUrl ?? undefined}
+                          target={profileUrl ? "_blank" : undefined}
+                          rel={profileUrl ? "noopener noreferrer" : undefined}
+                          aria-label={`Buka profil ${account.username}`}
+                        >
+                          <MdOpenInNew size={16} />
+                        </ActionIcon>
+                      </Tooltip>
+                    </Table.Td>
                   </Table.Tr>
-                ))}
+                  );
+                })}
             </Table.Tbody>
           </Table>
         </Table.ScrollContainer>
