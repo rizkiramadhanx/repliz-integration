@@ -234,6 +234,79 @@ docker logs -f traefik-manual-traefik-1     # routing & TLS
 | Sinkronisasi gagal unduh media | Cek `https://api.domain.com/uploads/` bisa diakses dari luar VPS |
 | Menu baru tidak muncul di sidebar | Logout–login ulang; permission disimpan di sesi saat login |
 | Scrape gagal / akun terputus | Cookies akun pemantau kedaluwarsa — perbarui lewat menu Account |
+| Backend/DB tiba-tiba mati, log Postgres `No space left on device` | Disk penuh — lihat [Pemeliharaan disk](#pemeliharaan-disk) |
+
+---
+
+## Pemeliharaan disk
+
+**Disk penuh = database mati.** Postgres yang tidak bisa menulis checkpoint
+akan PANIC, restart, lalu PANIC lagi — masuk crash-loop dan menolak semua
+koneksi dengan status `recovery mode`. Aplikasi ikut mati total.
+
+Ini bukan skenario hipotetis: penyumbang terbesarnya biasanya **build cache
+Docker**, yang menggembung beberapa GB hanya dari beberapa kali
+`./deploy.sh` karena tiap build menyimpan layer perantara.
+
+Di VPS ini risikonya lebih tinggi daripada di lokal, sebab volume
+`app_uploads` juga bertambah setiap hari dari media hasil scrape.
+
+### Pantau rutin
+
+```bash
+df -h /                 # disk host — usahakan minimal 20% bebas
+docker system df        # rincian: images, containers, volumes, build cache
+```
+
+Kalau `Use%` sudah di atas 80%, bersihkan sebelum jadi masalah.
+
+### Pembersihan aman
+
+```bash
+docker builder prune -af    # build cache — paling besar, paling aman
+docker image prune -af      # image tak terpakai container manapun
+```
+
+Keduanya **tidak menyentuh volume data**. Aman dijalankan kapan saja,
+termasuk saat aplikasi sedang berjalan.
+
+### ⛔ Jangan dijalankan
+
+```bash
+docker system prune -a --volumes    # JANGAN — ikut menghapus volume data
+docker compose down -v              # JANGAN — hapus postgres_data & app_uploads
+```
+
+Kedua perintah di atas menghapus **database dan seluruh media** secara
+permanen. `docker compose down` tanpa `-v` aman.
+
+### Otomatisasi (opsional)
+
+Bersihkan build cache tiap minggu lewat cron:
+
+```bash
+crontab -e
+# Setiap Minggu 03:00 — bersihkan cache build yang lebih tua dari 7 hari
+0 3 * * 0 /usr/bin/docker builder prune -af --filter until=168h > /dev/null 2>&1
+```
+
+### Pemulihan bila terlanjur penuh
+
+```bash
+docker builder prune -af                                  # 1. bebaskan ruang
+docker image prune -af
+df -h /                                                   # 2. pastikan ada ruang bebas
+docker compose -f docker-compose.yml restart postgres     # 3. pulihkan DB
+docker compose -f docker-compose.yml exec -T postgres pg_isready -U postgres
+```
+
+Postgres umumnya pulih sendiri lewat WAL recovery begitu ruang disk
+tersedia — data tidak hilang. Verifikasi setelahnya:
+
+```bash
+docker compose -f docker-compose.yml exec -T postgres \
+  psql -U postgres -d ternak_sosmed -c "select count(*) from accounts;"
+```
 
 ---
 
