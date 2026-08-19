@@ -2,8 +2,12 @@ node_modules
 # dist
 .git
 .gitignore
-# .env
-# .env.*
+# .env & .env.* WAJIB diabaikan: Dockerfile menjalankan `COPY . .` sebelum
+# vite build, dan Vite mem-bundle semua VITE_* ke JS publik. Kalau .env host
+# ikut ter-copy, nilainya menimpa build args dan bisa membocorkan kredensial
+# ke bundle yang bisa dibaca siapa pun.
+.env
+.env.*
 !.env.example
 *.md
 .vscode

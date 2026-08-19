@@ -54,6 +54,14 @@ services:
       MAIL_PASS: ${MAIL_PASS:-}
       MAIL_FROM: ${MAIL_FROM:-}
       ALERT_TARGET_EMAIL: ${ALERT_TARGET_EMAIL:-}
+      REPLIZ_BASE_URL: ${REPLIZ_BASE_URL:-https://api.repliz.com}
+      REPLIZ_ACCESS_KEY: ${REPLIZ_ACCESS_KEY:-}
+      REPLIZ_SECRET_KEY: ${REPLIZ_SECRET_KEY:-}
+      # Dipakai membentuk URL media yang diunduh server Repliz — default ke
+      # domain backend supaya sinkronisasi langsung benar tanpa setelan
+      # tambahan saat deploy.
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-https://${BACKEND_DOMAIN}}
+      SCRAPE_BROWSING_ACCOUNT_ID: ${SCRAPE_BROWSING_ACCOUNT_ID:-}
     volumes:
       - app_uploads:/usr/src/app/uploads
     depends_on:
