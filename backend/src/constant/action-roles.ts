@@ -24,7 +24,7 @@ const ACTION_ROLES = [
   },
   {
     name: 'repliz',
-    actions: ['repliz:read'],
+    actions: ['repliz:read', 'repliz:delete'],
   },
   {
     name: 'repliz-sync',

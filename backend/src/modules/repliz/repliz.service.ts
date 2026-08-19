@@ -61,6 +61,28 @@ export type CreateScheduleParams = {
   scheduleAt: string;
 };
 
+export type ReplizSchedule = {
+  _id: string;
+  id: string;
+  title: string;
+  description: string;
+  type: string;
+  status: string;
+  scheduleAt: string;
+  accountId: string;
+  medias?: { url: string; type: string; thumbnail?: string }[];
+  createdAt: string;
+};
+
+export type ListScheduleParams = {
+  page?: number;
+  limit?: number;
+  status?: string;
+  fromDate?: string;
+  toDate?: string;
+  accountIds?: string[];
+};
+
 export type ListAccountParams = {
   page?: number;
   limit?: number;
@@ -165,6 +187,56 @@ export class ReplizService {
     } catch (error) {
       if (error instanceof HttpException) throw error;
       this.toHttpException(error, 'Gagal membuat jadwal di Repliz');
+    }
+  }
+
+  async listSchedules(
+    params: ListScheduleParams = {},
+  ): Promise<ReplizPaginated<ReplizSchedule>> {
+    const { page = 1, limit = 50, status, fromDate, toDate, accountIds } =
+      params;
+
+    const query: Record<string, string | number> = { page, limit };
+    if (status) query.status = status;
+    if (fromDate) query.fromDate = fromDate;
+    if (toDate) query.toDate = toDate;
+    accountIds?.forEach((id, index) => {
+      query[`accountIds[${index}]`] = id;
+    });
+
+    try {
+      const response = await this.client.get<ReplizPaginated<ReplizSchedule>>(
+        '/public/schedule',
+        {
+          headers: { Authorization: this.authHeader() },
+          params: query,
+        },
+      );
+      return response.data;
+    } catch (error) {
+      if (error instanceof HttpException) throw error;
+      this.toHttpException(error, 'Gagal mengambil jadwal Repliz');
+    }
+  }
+
+  // Repliz mengharapkan scheduleIds[]=a&scheduleIds[]=b pada query string
+  // (bukan body), jadi disusun manual — axios `params` dengan array akan
+  // menghasilkan scheduleIds[0]=a yang tidak dikenali endpoint ini.
+  async deleteSchedules(scheduleIds: string[]): Promise<number> {
+    if (scheduleIds.length === 0) return 0;
+
+    const query = scheduleIds
+      .map((id) => `scheduleIds[]=${encodeURIComponent(id)}`)
+      .join('&');
+
+    try {
+      await this.client.delete(`/public/schedule/mass?${query}`, {
+        headers: { Authorization: this.authHeader() },
+      });
+      return scheduleIds.length;
+    } catch (error) {
+      if (error instanceof HttpException) throw error;
+      this.toHttpException(error, 'Gagal menghapus jadwal Repliz');
     }
   }
 

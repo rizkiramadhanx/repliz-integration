@@ -4,6 +4,7 @@ import {
   useGetAllSyncRule,
   useGetSyncedPost,
   useMutateDeleteSyncRule,
+  useMutateDeleteSyncedPost,
   useMutateRunSyncRule,
 } from "@/features/repliz-sync/hooks/useReplizSync";
 import type { typeDataReplizSyncRule } from "@/features/repliz-sync/type";
@@ -15,9 +16,12 @@ import {
   Badge,
   Box,
   Button,
+  Checkbox,
   Group,
+  Modal,
   Pagination,
   Select,
+  Stack,
   Table,
   Text,
   TextInput,
@@ -39,6 +43,9 @@ export default function PageReplizSync() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [syncedPage, setSyncedPage] = useState(1);
+  const [checkedIds, setCheckedIds] = useState<string[]>([]);
+  const [deleteMode, setDeleteMode] = useState<"selected" | "all" | null>(null);
+  const [alsoDeleteOnRepliz, setAlsoDeleteOnRepliz] = useState(true);
 
   const { data: dataRule, isLoading, refetch } = useGetAllSyncRule();
   const {
@@ -58,6 +65,8 @@ export default function PageReplizSync() {
   const { mutate: deleteRule, isPending: isDeleting } =
     useMutateDeleteSyncRule();
   const { mutate: runRule, isPending: isRunning } = useMutateRunSyncRule();
+  const { mutate: deleteSynced, isPending: isDeletingSynced } =
+    useMutateDeleteSyncedPost();
 
   const rules = dataRule?.data ?? [];
   const syncedPosts = dataSynced?.data?.data ?? [];
@@ -95,6 +104,41 @@ export default function PageReplizSync() {
         });
       },
     });
+  };
+
+  const handleDeleteSynced = () => {
+    if (!deleteMode) return;
+
+    deleteSynced(
+      {
+        ...(deleteMode === "selected"
+          ? { ids: checkedIds }
+          : { all: true }),
+        alsoDeleteOnRepliz,
+      },
+      {
+        onSuccess: (res) => {
+          notifications.show({
+            title: res.data.replizError ? "Sebagian gagal" : "Sukses",
+            message: res.message,
+            color: res.data.replizError ? "yellow" : "green",
+          });
+          setCheckedIds([]);
+          setDeleteMode(null);
+          setSyncedPage(1);
+          refetchSynced();
+        },
+        onError: (err: unknown) => {
+          const axErr = err as { response?: { data?: { message?: string } } };
+          notifications.show({
+            title: "Error",
+            message:
+              axErr?.response?.data?.message ?? "Gagal menghapus konten",
+            color: "red",
+          });
+        },
+      },
+    );
   };
 
   const handleDelete = () => {
@@ -353,11 +397,58 @@ export default function PageReplizSync() {
               Reset filter
             </Button>
           )}
+
+          <Button
+            color="red"
+            variant="light"
+            size="sm"
+            disabled={checkedIds.length === 0}
+            onClick={() => setDeleteMode("selected")}
+            leftSection={<MdDelete size={16} />}
+          >
+            Hapus terpilih ({checkedIds.length})
+          </Button>
+          <Button
+            color="red"
+            size="sm"
+            disabled={(syncedMeta?.total ?? 0) === 0}
+            onClick={() => setDeleteMode("all")}
+            leftSection={<MdDelete size={16} />}
+          >
+            Hapus semua
+          </Button>
         </Group>
         <Table.ScrollContainer minWidth={800}>
           <Table striped withTableBorder>
             <Table.Thead>
               <Table.Tr>
+                <Table.Th w={40}>
+                  <Checkbox
+                    aria-label="Pilih semua di halaman ini"
+                    checked={
+                      syncedPosts.length > 0 &&
+                      syncedPosts.every((p) => checkedIds.includes(p.id))
+                    }
+                    indeterminate={
+                      checkedIds.length > 0 &&
+                      !syncedPosts.every((p) => checkedIds.includes(p.id))
+                    }
+                    onChange={(e) =>
+                      setCheckedIds(
+                        e.currentTarget.checked
+                          ? Array.from(
+                              new Set([
+                                ...checkedIds,
+                                ...syncedPosts.map((p) => p.id),
+                              ]),
+                            )
+                          : checkedIds.filter(
+                              (id) => !syncedPosts.some((p) => p.id === id),
+                            ),
+                      )
+                    }
+                  />
+                </Table.Th>
                 <Table.Th>Konten</Table.Th>
                 <Table.Th>Caption</Table.Th>
                 <Table.Th>Dijadwalkan</Table.Th>
@@ -367,7 +458,7 @@ export default function PageReplizSync() {
             <Table.Tbody>
               {isSyncedError && (
                 <Table.Tr>
-                  <Table.Td colSpan={4}>
+                  <Table.Td colSpan={5}>
                     <Text ta="center" c="red" py={16}>
                       {syncedErrorMessage}
                     </Text>
@@ -377,7 +468,7 @@ export default function PageReplizSync() {
 
               {!isSyncedError && syncedPosts.length === 0 && (
                 <Table.Tr>
-                  <Table.Td colSpan={4}>
+                  <Table.Td colSpan={5}>
                     <Text ta="center" c="dimmed" py={16}>
                       {dateFrom || dateTo || statusFilter || selectedRuleId
                         ? "Tidak ada konten yang cocok dengan filter"
@@ -388,6 +479,19 @@ export default function PageReplizSync() {
               )}
               {syncedPosts.map((post) => (
                 <Table.Tr key={post.id}>
+                  <Table.Td>
+                    <Checkbox
+                      aria-label={`Pilih ${post.shortcode}`}
+                      checked={checkedIds.includes(post.id)}
+                      onChange={(e) =>
+                        setCheckedIds(
+                          e.currentTarget.checked
+                            ? [...checkedIds, post.id]
+                            : checkedIds.filter((id) => id !== post.id),
+                        )
+                      }
+                    />
+                  </Table.Td>
                   <Table.Td>
                     {post.postUrl ? (
                       <Anchor
@@ -452,6 +556,56 @@ export default function PageReplizSync() {
           )}
         </Group>
       )}
+
+      <Modal
+        opened={deleteMode !== null}
+        onClose={() => setDeleteMode(null)}
+        title="Hapus konten tersinkron"
+        centered
+      >
+        <Stack gap={12}>
+          <Text size="sm">
+            {deleteMode === "all" ? (
+              <>
+                Menghapus <b>seluruh {syncedMeta?.total ?? 0} catatan</b>{" "}
+                konten tersinkron
+                {selectedRuleId || dateFrom || dateTo || statusFilter
+                  ? " (filter yang aktif TIDAK berpengaruh — semua catatan terhapus)"
+                  : ""}
+                .
+              </>
+            ) : (
+              <>
+                Menghapus <b>{checkedIds.length} catatan</b> terpilih.
+              </>
+            )}
+          </Text>
+
+          <Checkbox
+            label="Hapus juga jadwalnya di Repliz"
+            description="Kalau tidak dicentang, jadwal tetap terbit di Repliz dan konten yang sama bisa terjadwal ulang pada sinkronisasi berikutnya."
+            checked={alsoDeleteOnRepliz}
+            onChange={(e) => setAlsoDeleteOnRepliz(e.currentTarget.checked)}
+          />
+
+          <Alert color="red" variant="light">
+            Tindakan ini permanen dan tidak bisa dibatalkan.
+          </Alert>
+
+          <Group justify="flex-end">
+            <Button variant="default" onClick={() => setDeleteMode(null)}>
+              Batal
+            </Button>
+            <Button
+              color="red"
+              loading={isDeletingSynced}
+              onClick={handleDeleteSynced}
+            >
+              Hapus
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
 
       <ModalFormSyncRule
         open={openForm}

@@ -23,6 +23,8 @@ import {
   createErrorResponse,
 } from '../../common/type/response';
 import { ReplizSyncService } from './repliz-sync.service';
+import { ReplizService } from '../repliz/repliz.service';
+import { In } from 'typeorm';
 import { ReplizSyncRuleEntity } from './entities/repliz-sync-rule.entity';
 import { ReplizSyncedPostEntity } from './entities/repliz-synced-post.entity';
 import {
@@ -39,6 +41,7 @@ function normalizeUsername(username: string): string {
 export class ReplizSyncController {
   constructor(
     private readonly syncService: ReplizSyncService,
+    private readonly replizService: ReplizService,
     @InjectRepository(ReplizSyncRuleEntity)
     private readonly ruleRepo: Repository<ReplizSyncRuleEntity>,
     @InjectRepository(ReplizSyncedPostEntity)
@@ -196,5 +199,85 @@ export class ReplizSyncController {
         total_page: Math.ceil(total / perPage),
       },
     });
+  }
+
+  // Menghapus catatan sinkronisasi. `alsoDeleteOnRepliz` menghapus pula
+  // jadwalnya di Repliz — dipisah sebagai opsi karena tidak selalu
+  // diinginkan: menghapus catatan lokal saja membuat konten itu dianggap
+  // baru lagi pada run berikutnya (anti-duplikat memakai tabel ini),
+  // sementara jadwal di Repliz tetap terbit.
+  @Delete('synced-post')
+  @Permissions('repliz-sync:delete')
+  async deleteSyncedPosts(
+    @Body()
+    body: {
+      ids?: string[];
+      ruleId?: string;
+      all?: boolean;
+      alsoDeleteOnRepliz?: boolean;
+    },
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const ids = (body?.ids ?? []).filter(Boolean);
+    const { ruleId, all, alsoDeleteOnRepliz } = body ?? {};
+
+    if (ids.length === 0 && !ruleId && !all) {
+      res.status(HttpStatus.BAD_REQUEST);
+      return createErrorResponse(
+        'Tentukan ids, ruleId, atau all:true',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    let where: Record<string, unknown>;
+    if (ids.length > 0) where = { id: In(ids) };
+    else if (ruleId) where = { ruleId };
+    else where = {};
+
+    const targets = await this.syncedRepo.find({ where });
+    if (targets.length === 0) {
+      res.status(HttpStatus.OK);
+      return createSuccessResponse('Tidak ada konten yang dihapus', {
+        deleted: 0,
+        deletedOnRepliz: 0,
+      });
+    }
+
+    let deletedOnRepliz = 0;
+    let replizError: string | null = null;
+
+    if (alsoDeleteOnRepliz) {
+      const scheduleIds = targets
+        .map((row) => row.replizScheduleId)
+        .filter((id): id is string => Boolean(id));
+
+      if (scheduleIds.length > 0) {
+        try {
+          deletedOnRepliz =
+            await this.replizService.deleteSchedules(scheduleIds);
+        } catch (err) {
+          // Kegagalan di Repliz tidak membatalkan penghapusan lokal, tapi
+          // dilaporkan supaya tidak terlihat sukses sepenuhnya.
+          replizError =
+            err instanceof Error ? err.message : 'Gagal menghapus di Repliz';
+        }
+      }
+    }
+
+    await this.syncedRepo.delete(targets.map((row) => row.id));
+
+    res.status(HttpStatus.OK);
+    return createSuccessResponse(
+      replizError
+        ? `${targets.length} catatan dihapus, tapi gagal menghapus di Repliz: ${replizError}`
+        : alsoDeleteOnRepliz
+          ? `${targets.length} catatan dihapus, ${deletedOnRepliz} jadwal dihapus di Repliz`
+          : `${targets.length} catatan dihapus`,
+      {
+        deleted: targets.length,
+        deletedOnRepliz,
+        replizError,
+      },
+    );
   }
 }

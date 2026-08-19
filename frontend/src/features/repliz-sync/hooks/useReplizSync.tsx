@@ -121,6 +121,33 @@ export function useMutateDeleteSyncRule() {
   });
 }
 
+export type typeDeleteSyncedPostPayload = {
+  ids?: string[];
+  ruleId?: string;
+  all?: boolean;
+  alsoDeleteOnRepliz?: boolean;
+};
+
+export function useMutateDeleteSyncedPost() {
+  return useMutation({
+    mutationFn: async (payload: typeDeleteSyncedPostPayload) => {
+      const response = await axiosInstanceAPI.request<{
+        message: string;
+        data: {
+          deleted: number;
+          deletedOnRepliz: number;
+          replizError: string | null;
+        };
+      }>({
+        method: "DELETE",
+        url: "/api/repliz-sync/synced-post",
+        data: payload,
+      });
+      return response.data;
+    },
+  });
+}
+
 export function useMutateRunSyncRule() {
   return useMutation({
     mutationFn: async (id: string) => {
