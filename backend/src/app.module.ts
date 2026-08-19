@@ -14,6 +14,7 @@ import { MailModule } from './modules/mailer/mailer.module';
 import { LogsModule } from './modules/logs/logs.module';
 import { AccountsModule } from './modules/accounts/accounts.module';
 import { ReplizModule } from './modules/repliz/repliz.module';
+import { ReplizSyncModule } from './modules/repliz-sync/repliz-sync.module';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { ReplizModule } from './modules/repliz/repliz.module';
     RolesModule,
     AccountsModule,
     ReplizModule,
+    ReplizSyncModule,
   ],
   controllers: [AppController],
   providers: [

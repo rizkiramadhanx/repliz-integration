@@ -1,0 +1,240 @@
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { AccountEntity } from '../accounts/entities/account.entity';
+import { ReplizService } from '../repliz/repliz.service';
+import { ReplizSyncRuleEntity } from './entities/repliz-sync-rule.entity';
+import { ReplizSyncedPostEntity } from './entities/repliz-synced-post.entity';
+import { scrapeLatestInstagramPosts } from './worker/instagram-scraper.util';
+import {
+  assertPublicBaseUrlUsable,
+  buildPublicUrl,
+  downloadToPublicDir,
+} from './worker/public-media.util';
+
+export type RunRuleResult = {
+  ruleId: string;
+  targetUsername: string;
+  scraped: number;
+  fresh: number;
+  scheduled: number;
+  failed: number;
+  message: string;
+};
+
+@Injectable()
+export class ReplizSyncService {
+  private readonly logger = new Logger(ReplizSyncService.name);
+
+  constructor(
+    @InjectRepository(ReplizSyncRuleEntity)
+    private readonly ruleRepo: Repository<ReplizSyncRuleEntity>,
+    @InjectRepository(ReplizSyncedPostEntity)
+    private readonly syncedRepo: Repository<ReplizSyncedPostEntity>,
+    @InjectRepository(AccountEntity)
+    private readonly accountRepo: Repository<AccountEntity>,
+    private readonly replizService: ReplizService,
+    private readonly configService: ConfigService,
+  ) {}
+
+  // Akun pemantau (x) tunggal untuk seluruh sistem. Dipilih lewat env
+  // SCRAPE_BROWSING_ACCOUNT_ID; kalau tidak diisi, dipakai akun Instagram
+  // pertama yang terhubung — supaya sistem tetap jalan tanpa konfigurasi
+  // tambahan pada instalasi dengan satu akun IG saja.
+  private async resolveBrowsingAccount(): Promise<AccountEntity> {
+    const configuredId = this.configService.get<string>(
+      'SCRAPE_BROWSING_ACCOUNT_ID',
+    );
+
+    if (configuredId) {
+      const account = await this.accountRepo.findOne({
+        where: { id: configuredId },
+      });
+      if (!account) {
+        throw new NotFoundException(
+          `Akun pemantau (SCRAPE_BROWSING_ACCOUNT_ID=${configuredId}) tidak ditemukan`,
+        );
+      }
+      return account;
+    }
+
+    const fallback = await this.accountRepo.findOne({
+      where: { type: 'instagram' },
+      order: { createdAt: 'ASC' },
+    });
+    if (!fallback) {
+      throw new NotFoundException(
+        'Belum ada akun Instagram untuk dipakai sebagai akun pemantau. Tambahkan di menu Account atau set SCRAPE_BROWSING_ACCOUNT_ID.',
+      );
+    }
+    return fallback;
+  }
+
+  // scheduleAt disusun mulai dari jam yang ditentukan rule pada hari ini.
+  // Kalau jam itu sudah lewat (mis. cron telat / run manual siang hari),
+  // titik mulai digeser ke sekarang + 1 interval supaya Repliz tidak
+  // menerima jadwal di masa lalu yang akan langsung terbit sekaligus.
+  private buildScheduleTimes(
+    rule: ReplizSyncRuleEntity,
+    count: number,
+  ): Date[] {
+    const [hour, minute] = rule.scheduleStartTime
+      .split(':')
+      .map((value) => Number(value));
+
+    const start = new Date();
+    start.setHours(hour || 0, minute || 0, 0, 0);
+
+    const intervalMs = rule.scheduleIntervalMinutes * 60 * 1000;
+    const now = Date.now();
+    if (start.getTime() <= now) {
+      start.setTime(now + intervalMs);
+    }
+
+    return Array.from(
+      { length: count },
+      (_, index) => new Date(start.getTime() + index * intervalMs),
+    );
+  }
+
+  async runRule(ruleId: string): Promise<RunRuleResult> {
+    const rule = await this.ruleRepo.findOne({ where: { id: ruleId } });
+    if (!rule) throw new NotFoundException('Rule tidak ditemukan');
+
+    // Dicek sebelum scraping supaya tidak membuka browser hanya untuk
+    // gagal di langkah terakhir saat URL media ternyata tidak publik.
+    assertPublicBaseUrlUsable();
+
+    const browsingAccount = await this.resolveBrowsingAccount();
+
+    const alreadySynced = await this.syncedRepo.find({
+      where: { ruleId: rule.id },
+      select: { shortcode: true },
+    });
+    const excludeShortcodes = new Set(
+      alreadySynced.map((row) => row.shortcode),
+    );
+
+    const posts = await scrapeLatestInstagramPosts(
+      browsingAccount,
+      rule.targetUsername,
+      rule.maxItems,
+      excludeShortcodes,
+      rule.scrapeMode,
+    );
+
+    const fresh = posts.filter(
+      (post) => !excludeShortcodes.has(post.shortcode),
+    );
+
+    const scheduleTimes = this.buildScheduleTimes(rule, fresh.length);
+    let scheduled = 0;
+    let failed = 0;
+
+    for (const [index, post] of fresh.entries()) {
+      const scheduledAt = scheduleTimes[index];
+
+      try {
+        const media = await downloadToPublicDir(post.mediaUrl);
+        const publicUrl = buildPublicUrl(media.publicPath);
+
+        const result = await this.replizService.createSchedule({
+          accountId: rule.replizAccountId,
+          title: '',
+          description: post.caption ?? '',
+          type: post.isVideo ? 'video' : 'image',
+          medias: [
+            {
+              url: publicUrl,
+              type: post.isVideo ? 'video' : 'image',
+            },
+          ],
+          scheduleAt: scheduledAt.toISOString(),
+        });
+
+        await this.syncedRepo.save(
+          this.syncedRepo.create({
+            ruleId: rule.id,
+            shortcode: post.shortcode,
+            postUrl: `https://www.instagram.com/p/${post.shortcode}/`,
+            caption: post.caption ?? null,
+            mediaUrl: publicUrl,
+            isVideo: post.isVideo,
+            replizScheduleId: result.scheduleId,
+            scheduledAt,
+            status: 'scheduled',
+          }),
+        );
+        scheduled += 1;
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : 'Gagal memproses konten';
+        this.logger.error(
+          `Rule ${rule.id} gagal memproses ${post.shortcode}: ${message}`,
+        );
+
+        // Kegagalan tetap dicatat supaya konten yang sama tidak dicoba
+        // berulang tiap hari; status 'failed' membedakannya dari yang
+        // benar-benar terjadwal saat ditinjau di UI.
+        await this.syncedRepo.save(
+          this.syncedRepo.create({
+            ruleId: rule.id,
+            shortcode: post.shortcode,
+            postUrl: `https://www.instagram.com/p/${post.shortcode}/`,
+            caption: post.caption ?? null,
+            isVideo: post.isVideo,
+            status: 'failed',
+            errorMessage: message,
+          }),
+        );
+        failed += 1;
+      }
+    }
+
+    const message = `Scrape ${posts.length}, baru ${fresh.length}, terjadwal ${scheduled}, gagal ${failed}`;
+
+    await this.ruleRepo.update(rule.id, {
+      lastRunAt: new Date(),
+      lastRunStatus: failed > 0 && scheduled === 0 ? 'failed' : 'success',
+      lastRunMessage: message,
+    });
+
+    return {
+      ruleId: rule.id,
+      targetUsername: rule.targetUsername,
+      scraped: posts.length,
+      fresh: fresh.length,
+      scheduled,
+      failed,
+      message,
+    };
+  }
+
+  async runAllActiveRules(): Promise<RunRuleResult[]> {
+    const rules = await this.ruleRepo.find({
+      where: { status: 'active' },
+      order: { createdAt: 'ASC' },
+    });
+
+    const results: RunRuleResult[] = [];
+    // Sengaja berurutan, bukan paralel: semua rule memakai satu akun
+    // pemantau yang sama, dan membuka banyak sesi Instagram bersamaan dari
+    // satu akun justru memicu deteksi otomatis.
+    for (const rule of rules) {
+      try {
+        results.push(await this.runRule(rule.id));
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : 'Gagal menjalankan rule';
+        this.logger.error(`Rule ${rule.id} gagal: ${message}`);
+        await this.ruleRepo.update(rule.id, {
+          lastRunAt: new Date(),
+          lastRunStatus: 'failed',
+          lastRunMessage: message,
+        });
+      }
+    }
+    return results;
+  }
+}

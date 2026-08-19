@@ -23,6 +23,10 @@ const ROLES: { name: string; actions: string[] }[] = [
       'account:read',
       'account:update',
       'repliz:read',
+      'repliz-sync:create',
+      'repliz-sync:read',
+      'repliz-sync:update',
+      'repliz-sync:run',
     ],
   },
   {
@@ -31,6 +35,7 @@ const ROLES: { name: string; actions: string[] }[] = [
     actions: [
       'account:read',
       'repliz:read',
+      'repliz-sync:read',
     ],
   },
 ];

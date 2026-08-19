@@ -33,6 +33,34 @@ export type ReplizPaginated<T> = {
   nextPage: number | null;
 };
 
+export type ReplizMedia = {
+  url: string;
+  type: 'image' | 'video';
+  thumbnail?: string;
+  alt?: string;
+};
+
+// Tipe konten yang diterima Repliz. `reel`, `link`, dan `story` belum
+// dipakai sync otomatis, tapi ikut didefinisikan supaya pemanggil lain
+// tidak perlu mengulang daftar ini.
+export type ReplizScheduleType =
+  | 'text'
+  | 'image'
+  | 'video'
+  | 'reel'
+  | 'album'
+  | 'link'
+  | 'story';
+
+export type CreateScheduleParams = {
+  accountId: string;
+  title: string;
+  description: string;
+  type: ReplizScheduleType;
+  medias: ReplizMedia[];
+  scheduleAt: string;
+};
+
 export type ListAccountParams = {
   page?: number;
   limit?: number;
@@ -114,6 +142,29 @@ export class ReplizService {
     } catch (error) {
       if (error instanceof HttpException) throw error;
       this.toHttpException(error, 'Gagal mengambil daftar akun Repliz');
+    }
+  }
+
+  async createSchedule(
+    params: CreateScheduleParams,
+  ): Promise<{ scheduleId: string }> {
+    try {
+      const response = await this.client.post<{ scheduleId: string }>(
+        '/public/schedule',
+        {
+          title: params.title,
+          description: params.description,
+          type: params.type,
+          medias: params.medias,
+          accountId: params.accountId,
+          scheduleAt: params.scheduleAt,
+        },
+        { headers: { Authorization: this.authHeader() } },
+      );
+      return response.data;
+    } catch (error) {
+      if (error instanceof HttpException) throw error;
+      this.toHttpException(error, 'Gagal membuat jadwal di Repliz');
     }
   }
 

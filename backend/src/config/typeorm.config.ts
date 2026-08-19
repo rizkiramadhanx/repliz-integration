@@ -6,6 +6,8 @@ import { RoleEntity } from '../modules/roles/entities/role.entity';
 import { LogEntity } from '../modules/logs/entities/log.entity';
 import { AccountEntity } from '../modules/accounts/entities/account.entity';
 import { AccountDelegationEntity } from '../modules/accounts/entities/account-delegation.entity';
+import { ReplizSyncRuleEntity } from '../modules/repliz-sync/entities/repliz-sync-rule.entity';
+import { ReplizSyncedPostEntity } from '../modules/repliz-sync/entities/repliz-synced-post.entity';
 
 config();
 
@@ -28,6 +30,8 @@ export default new DataSource({
     LogEntity,
     AccountEntity,
     AccountDelegationEntity,
+    ReplizSyncRuleEntity,
+    ReplizSyncedPostEntity,
   ],
   migrations: [join(__dirname, '..', 'migration', `*.${migrationExt}`)],
   synchronize: false,

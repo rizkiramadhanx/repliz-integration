@@ -26,6 +26,16 @@ const ACTION_ROLES = [
     name: 'repliz',
     actions: ['repliz:read'],
   },
+  {
+    name: 'repliz-sync',
+    actions: [
+      'repliz-sync:create',
+      'repliz-sync:read',
+      'repliz-sync:update',
+      'repliz-sync:delete',
+      'repliz-sync:run',
+    ],
+  },
 ];
 
 export default ACTION_ROLES;
