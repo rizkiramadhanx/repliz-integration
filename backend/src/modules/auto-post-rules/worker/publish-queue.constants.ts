@@ -1,1 +1,0 @@
-export const PUBLISH_QUEUE_NAME = 'auto-post-publish';

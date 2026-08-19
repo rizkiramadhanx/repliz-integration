@@ -13,9 +13,6 @@ import { APP_INTERCEPTOR } from '@nestjs/core';
 import { MailModule } from './modules/mailer/mailer.module';
 import { LogsModule } from './modules/logs/logs.module';
 import { AccountsModule } from './modules/accounts/accounts.module';
-import { PostHistoryModule } from './modules/post-history/post-history.module';
-import { AutoPostRulesModule } from './modules/auto-post-rules/auto-post-rules.module';
-import { ScheduledPostsModule } from './modules/scheduled-posts/scheduled-posts.module';
 
 @Module({
   imports: [
@@ -38,9 +35,6 @@ import { ScheduledPostsModule } from './modules/scheduled-posts/scheduled-posts.
     MailModule,
     RolesModule,
     AccountsModule,
-    PostHistoryModule,
-    AutoPostRulesModule,
-    ScheduledPostsModule,
   ],
   controllers: [AppController],
   providers: [

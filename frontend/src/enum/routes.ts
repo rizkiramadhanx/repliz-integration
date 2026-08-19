@@ -13,23 +13,8 @@ export const ROUTES = {
     Account: {
       View: "/master-data/account",
     },
-    AutoPostRule: {
-      View: "/master-data/auto-post-rule",
-    },
-  },
-  Log: {
-    View: "/log",
-  },
-  PostHistory: {
-    View: "/post-history",
-  },
-  ScheduledPost: {
-    View: "/scheduled-post",
   },
   Guide: {
     View: "/guide",
-  },
-  Tools: {
-    View: "/tools",
   },
 };
