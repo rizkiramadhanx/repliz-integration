@@ -225,9 +225,14 @@ export class ReplizSyncController {
     const currentPage = Math.max(1, Number(page) || 1);
     const perPage = Math.min(200, Math.max(1, Number(limit) || 25));
 
+    // Diurutkan berdasarkan scheduledAt, bukan createdAt: seluruh konten satu
+    // run tersimpan dalam hitungan detik sehingga createdAt tidak membedakan
+    // urutan tayang. scheduledAt menaik menampilkan konten sesuai urutan
+    // terbitnya — sama dengan urutan asli di profil sumber. createdAt dipakai
+    // sebagai penentu kedua untuk baris gagal yang scheduledAt-nya null.
     const [posts, total] = await this.syncedRepo.findAndCount({
       where,
-      order: { createdAt: 'DESC' },
+      order: { scheduledAt: 'ASC', createdAt: 'ASC' },
       skip: (currentPage - 1) * perPage,
       take: perPage,
     });

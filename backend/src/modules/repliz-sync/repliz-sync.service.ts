@@ -136,9 +136,14 @@ export class ReplizSyncService {
           rule.scrapeMode,
         );
 
-        const fresh = posts.filter(
-          (post) => !excludeShortcodes.has(post.shortcode),
-        );
+        // Scraper mengembalikan konten dari yang TERBARU lebih dulu (urutan
+        // tampilan profil Instagram). Kalau dijadwalkan apa adanya, konten
+        // terbaru justru terbit paling awal dan yang lama terbit belakangan —
+        // urutan terbalik dari aslinya. Dibalik supaya terbit runut sesuai
+        // urutan asli: yang paling lama duluan, terbaru terakhir.
+        const fresh = posts
+          .filter((post) => !excludeShortcodes.has(post.shortcode))
+          .reverse();
 
         let scheduled = 0;
         let failed = 0;
