@@ -5,7 +5,7 @@ import { BiUser } from "react-icons/bi";
 import { FaDatabase } from "react-icons/fa";
 import { HiShieldCheck } from "react-icons/hi";
 import { MdHelpOutline } from "react-icons/md";
-import { TbBrandCampaignmonitor } from "react-icons/tb";
+import { TbBrandCampaignmonitor, TbRefreshDot } from "react-icons/tb";
 import { FaUserShield } from "react-icons/fa6";
 
 export type SidebarMenuChild = {
@@ -54,6 +54,12 @@ const SidebarMenu: SidebarMenuItem[] = [
     icon: <TbBrandCampaignmonitor />,
     path: ROUTES.Repliz.View,
     modules: [MODULE_LIST.Repliz.Read],
+  },
+  {
+    title: "Sinkronisasi Repliz",
+    icon: <TbRefreshDot />,
+    path: ROUTES.ReplizSync.View,
+    modules: [MODULE_LIST.ReplizSync.Read],
   },
   {
     title: "Panduan",

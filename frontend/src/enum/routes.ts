@@ -17,6 +17,9 @@ export const ROUTES = {
   Repliz: {
     View: "/repliz",
   },
+  ReplizSync: {
+    View: "/repliz-sync",
+  },
   Guide: {
     View: "/guide",
   },

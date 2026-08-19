@@ -22,4 +22,11 @@ export const MODULE_LIST = {
   Repliz: {
     Read: "repliz:read",
   },
+  ReplizSync: {
+    Create: "repliz-sync:create",
+    Read: "repliz-sync:read",
+    Update: "repliz-sync:update",
+    Delete: "repliz-sync:delete",
+    Run: "repliz-sync:run",
+  },
 };
