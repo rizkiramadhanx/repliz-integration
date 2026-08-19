@@ -18,16 +18,50 @@ export function useGetAllSyncRule() {
   });
 }
 
-export function useGetSyncedPost(ruleId?: string) {
+export type typeSyncedPostFilter = {
+  ruleId?: string;
+  status?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  page?: number;
+  limit?: number;
+};
+
+export function useGetSyncedPost(filter: typeSyncedPostFilter = {}) {
+  const { ruleId, status, dateFrom, dateTo, page = 1, limit = 25 } = filter;
+
   return useQuery({
-    queryKey: ["repliz-synced-post", ruleId],
+    queryKey: [
+      "repliz-synced-post",
+      ruleId,
+      status,
+      dateFrom,
+      dateTo,
+      page,
+      limit,
+    ],
     queryFn: async () => {
       const response = await axiosInstanceAPI.request<{
-        data: typeDataReplizSyncedPost[];
+        data: {
+          data: typeDataReplizSyncedPost[];
+          meta: {
+            page: number;
+            limit: number;
+            total: number;
+            total_page: number;
+          };
+        };
       }>({
         method: "GET",
         url: "/api/repliz-sync/synced-post",
-        params: ruleId ? { ruleId } : undefined,
+        params: {
+          page,
+          limit,
+          ...(ruleId ? { ruleId } : {}),
+          ...(status ? { status } : {}),
+          ...(dateFrom ? { dateFrom } : {}),
+          ...(dateTo ? { dateTo } : {}),
+        },
       });
       return response.data;
     },

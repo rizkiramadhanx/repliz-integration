@@ -14,7 +14,7 @@ import {
 } from '@nestjs/common';
 import { Response } from 'express';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Between, LessThanOrEqual, MoreThanOrEqual, Repository } from 'typeorm';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import { PermissionsGuard } from '../auth/guards/permissions.guard';
@@ -141,13 +141,60 @@ export class ReplizSyncController {
   async listSyncedPosts(
     @Res({ passthrough: true }) res: Response,
     @Query('ruleId') ruleId?: string,
+    @Query('status') status?: string,
+    @Query('dateFrom') dateFrom?: string,
+    @Query('dateTo') dateTo?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
   ) {
-    const posts = await this.syncedRepo.find({
-      where: ruleId ? { ruleId } : {},
+    // Rentang tanggal difilter pada created_at (kapan konten diproses),
+    // bukan scheduled_at — scheduled_at bisa null untuk konten yang gagal,
+    // sehingga memfilter dengannya akan menyembunyikan justru baris yang
+    // paling perlu ditinjau.
+    const from = dateFrom ? new Date(`${dateFrom}T00:00:00.000Z`) : null;
+    const to = dateTo ? new Date(`${dateTo}T23:59:59.999Z`) : null;
+
+    if ((from && isNaN(from.getTime())) || (to && isNaN(to.getTime()))) {
+      res.status(HttpStatus.BAD_REQUEST);
+      return createErrorResponse(
+        'Format tanggal tidak valid, gunakan YYYY-MM-DD',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+    if (from && to && from > to) {
+      res.status(HttpStatus.BAD_REQUEST);
+      return createErrorResponse(
+        'dateFrom tidak boleh melewati dateTo',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const where: Record<string, unknown> = {};
+    if (ruleId) where.ruleId = ruleId;
+    if (status) where.status = status;
+    if (from && to) where.createdAt = Between(from, to);
+    else if (from) where.createdAt = MoreThanOrEqual(from);
+    else if (to) where.createdAt = LessThanOrEqual(to);
+
+    const currentPage = Math.max(1, Number(page) || 1);
+    const perPage = Math.min(200, Math.max(1, Number(limit) || 25));
+
+    const [posts, total] = await this.syncedRepo.findAndCount({
+      where,
       order: { createdAt: 'DESC' },
-      take: 200,
+      skip: (currentPage - 1) * perPage,
+      take: perPage,
     });
+
     res.status(HttpStatus.OK);
-    return createSuccessResponse('Berhasil mengambil konten tersinkron', posts);
+    return createSuccessResponse('Berhasil mengambil konten tersinkron', {
+      data: posts,
+      meta: {
+        page: currentPage,
+        limit: perPage,
+        total,
+        total_page: Math.ceil(total / perPage),
+      },
+    });
   }
 }

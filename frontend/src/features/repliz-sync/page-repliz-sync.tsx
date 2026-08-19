@@ -16,8 +16,11 @@ import {
   Box,
   Button,
   Group,
+  Pagination,
+  Select,
   Table,
   Text,
+  TextInput,
   Tooltip,
 } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
@@ -32,17 +35,44 @@ export default function PageReplizSync() {
   const [editing, setEditing] = useState<typeDataReplizSyncRule | null>(null);
   const [deleting, setDeleting] = useState<typeDataReplizSyncRule | null>(null);
   const [selectedRuleId, setSelectedRuleId] = useState<string | undefined>();
+  const [statusFilter, setStatusFilter] = useState<string | null>(null);
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [syncedPage, setSyncedPage] = useState(1);
 
   const { data: dataRule, isLoading, refetch } = useGetAllSyncRule();
-  const { data: dataSynced, refetch: refetchSynced } =
-    useGetSyncedPost(selectedRuleId);
+  const {
+    data: dataSynced,
+    refetch: refetchSynced,
+    isError: isSyncedError,
+    error: syncedError,
+  } = useGetSyncedPost({
+    ruleId: selectedRuleId,
+    status: statusFilter ?? undefined,
+    dateFrom: dateFrom || undefined,
+    dateTo: dateTo || undefined,
+    page: syncedPage,
+    limit: 25,
+  });
 
   const { mutate: deleteRule, isPending: isDeleting } =
     useMutateDeleteSyncRule();
   const { mutate: runRule, isPending: isRunning } = useMutateRunSyncRule();
 
   const rules = dataRule?.data ?? [];
-  const syncedPosts = dataSynced?.data ?? [];
+  const syncedPosts = dataSynced?.data?.data ?? [];
+  const syncedMeta = dataSynced?.data?.meta;
+  const syncedErrorMessage =
+    (syncedError as { response?: { data?: { message?: string } } })?.response
+      ?.data?.message ?? "Gagal memuat konten tersinkron";
+
+  // Mengubah filter apa pun harus mengembalikan ke halaman 1 — kalau tidak,
+  // pengguna yang sedang di halaman 3 lalu mempersempit rentang tanggal akan
+  // melihat tabel kosong padahal datanya ada di halaman 1.
+  const applyFilter = (fn: () => void) => {
+    fn();
+    setSyncedPage(1);
+  };
 
   const handleRun = (rule: typeDataReplizSyncRule) => {
     runRule(rule.id, {
@@ -160,7 +190,7 @@ export default function PageReplizSync() {
             {rules.map((rule) => (
               <Table.Tr
                 key={rule.id}
-                onClick={() => setSelectedRuleId(rule.id)}
+                onClick={() => applyFilter(() => setSelectedRuleId(rule.id))}
                 style={{ cursor: "pointer" }}
                 bg={selectedRuleId === rule.id ? "var(--mantine-color-blue-0)" : undefined}
               >
@@ -273,6 +303,57 @@ export default function PageReplizSync() {
             </Text>
           )}
         </Text>
+
+        <Group gap={10} mb={12} align="flex-end" wrap="wrap">
+          <TextInput
+            label="Dari tanggal"
+            type="date"
+            value={dateFrom}
+            onChange={(e) => {
+              const v = e.currentTarget.value;
+              applyFilter(() => setDateFrom(v));
+            }}
+            w={{ base: "100%", sm: 170 }}
+          />
+          <TextInput
+            label="Sampai tanggal"
+            type="date"
+            value={dateTo}
+            onChange={(e) => {
+              const v = e.currentTarget.value;
+              applyFilter(() => setDateTo(v));
+            }}
+            w={{ base: "100%", sm: 170 }}
+          />
+          <Select
+            label="Status"
+            placeholder="Semua"
+            clearable
+            data={[
+              { value: "scheduled", label: "Terjadwal" },
+              { value: "failed", label: "Gagal" },
+            ]}
+            value={statusFilter}
+            onChange={(v) => applyFilter(() => setStatusFilter(v))}
+            w={{ base: "100%", sm: 150 }}
+          />
+          {(dateFrom || dateTo || statusFilter || selectedRuleId) && (
+            <Button
+              variant="subtle"
+              size="sm"
+              onClick={() =>
+                applyFilter(() => {
+                  setDateFrom("");
+                  setDateTo("");
+                  setStatusFilter(null);
+                  setSelectedRuleId(undefined);
+                })
+              }
+            >
+              Reset filter
+            </Button>
+          )}
+        </Group>
         <Table.ScrollContainer minWidth={800}>
           <Table striped withTableBorder>
             <Table.Thead>
@@ -284,11 +365,23 @@ export default function PageReplizSync() {
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
-              {syncedPosts.length === 0 && (
+              {isSyncedError && (
+                <Table.Tr>
+                  <Table.Td colSpan={4}>
+                    <Text ta="center" c="red" py={16}>
+                      {syncedErrorMessage}
+                    </Text>
+                  </Table.Td>
+                </Table.Tr>
+              )}
+
+              {!isSyncedError && syncedPosts.length === 0 && (
                 <Table.Tr>
                   <Table.Td colSpan={4}>
                     <Text ta="center" c="dimmed" py={16}>
-                      Belum ada konten tersinkron
+                      {dateFrom || dateTo || statusFilter || selectedRuleId
+                        ? "Tidak ada konten yang cocok dengan filter"
+                        : "Belum ada konten tersinkron"}
                     </Text>
                   </Table.Td>
                 </Table.Tr>
@@ -343,6 +436,22 @@ export default function PageReplizSync() {
           </Table>
         </Table.ScrollContainer>
       </Box>
+
+      {syncedMeta && syncedMeta.total > 0 && (
+        <Group justify="space-between" mt={12} wrap="wrap">
+          <Text size="sm" c="dimmed">
+            Total {syncedMeta.total} konten
+          </Text>
+          {syncedMeta.total_page > 1 && (
+            <Pagination
+              total={syncedMeta.total_page}
+              value={syncedPage}
+              onChange={setSyncedPage}
+              size="sm"
+            />
+          )}
+        </Group>
+      )}
 
       <ModalFormSyncRule
         open={openForm}
