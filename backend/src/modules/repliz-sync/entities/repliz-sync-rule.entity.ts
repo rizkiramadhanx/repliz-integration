@@ -4,7 +4,6 @@ import {
   Column,
   CreateDateColumn,
   UpdateDateColumn,
-  Index,
 } from 'typeorm';
 
 export type ReplizSyncRuleStatus = 'active' | 'paused';
@@ -13,13 +12,12 @@ export type ReplizSyncRuleStatus = 'active' | 'paused';
 //   x = akun pemantau (cookies IG) yang membuka Instagram untuk membaca.
 //       Hanya SATU untuk seluruh sistem, ditentukan lewat setelan global
 //       (SCRAPE_BROWSING_ACCOUNT_ID) — jadi tidak disimpan per rule.
-//   z = akun target yang dikloning kontennya. BISA BANYAK: satu rule =
-//       satu z, tambah target berarti tambah rule.
+//   z = akun target yang dikloning kontennya. BISA BANYAK dalam satu rule
+//       (targetUsernames), semuanya memakai setelan jadwal yang sama.
 //   y = akun Repliz tujuan posting (replizAccountId).
 // x tidak pernah dipakai untuk memposting — yang memposting adalah y lewat
 // API resmi Repliz, sehingga akun pemantau tidak terekspos risiko ban.
 @Entity('repliz_sync_rules')
-@Index('UQ_repliz_sync_rule_target', ['targetUsername'], { unique: true })
 export class ReplizSyncRuleEntity {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -27,11 +25,12 @@ export class ReplizSyncRuleEntity {
   @Column({ name: 'label' })
   label: string;
 
-  // Akun "z" — username Instagram target yang dikloning. Unique, supaya
-  // satu target tidak bisa didaftarkan dua kali (yang akan membuat konten
-  // yang sama terjadwal ganda di Repliz).
-  @Column({ name: 'target_username' })
-  targetUsername: string;
+  // Akun "z" — daftar username Instagram yang dikloning. Disimpan sebagai
+  // array supaya satu rule bisa menangani banyak target dengan setelan
+  // jadwal yang sama; tiap target tetap dipisahkan saat scraping dan
+  // pencatatan anti-duplikat.
+  @Column({ name: 'target_usernames', type: 'text', array: true, default: () => "'{}'" })
+  targetUsernames: string[];
 
   // Akun "y" — tujuan posting di Repliz (account id dari
   // GET /public/account).

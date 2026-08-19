@@ -9,16 +9,38 @@ import {
   Min,
 } from 'class-validator';
 
+// Menerima array maupun string dipisah koma/spasi, lalu menormalkan tiap
+// entri: buang '@', spasi, dan duplikat. Bentuk string didukung karena form
+// bisa mengirim satu field teks berisi beberapa target.
+//
+// Normalisasi sengaja dilakukan di controller, bukan lewat @Transform:
+// ValidationPipe global dipasang tanpa transform: true, sehingga dekorator
+// class-transformer tidak dijalankan sama sekali. Mengaktifkannya secara
+// global akan mengubah perilaku semua endpoint lain.
+export function normalizeUsernames(value: unknown): string[] {
+  const raw = Array.isArray(value)
+    ? value
+    : typeof value === 'string'
+      ? value.split(/[,\s]+/)
+      : [];
+
+  const cleaned = raw
+    .map((item) => String(item).trim().replace(/^@+/, ''))
+    .filter((item) => item.length > 0);
+
+  return Array.from(new Set(cleaned));
+}
+
 export class CreateReplizSyncRuleDto {
   @IsString()
   @IsNotEmpty()
   label: string;
 
-  // Username target (z) — disimpan tanpa '@' supaya konsisten saat
-  // dipakai menyusun URL Instagram.
-  @IsString()
-  @IsNotEmpty()
-  targetUsername: string;
+  // Username target (z) — bisa banyak. Disimpan tanpa '@' supaya konsisten
+  // saat dipakai menyusun URL Instagram.
+  // Divalidasi manual di controller lewat normalizeUsernames() karena
+  // nilainya boleh string maupun array.
+  targetUsernames: string[] | string;
 
   @IsString()
   @IsNotEmpty()
@@ -61,9 +83,7 @@ export class UpdateReplizSyncRuleDto extends CreateReplizSyncRuleDto {
   declare label: string;
 
   @IsOptional()
-  @IsString()
-  @IsNotEmpty()
-  declare targetUsername: string;
+  declare targetUsernames: string[] | string;
 
   @IsOptional()
   @IsString()

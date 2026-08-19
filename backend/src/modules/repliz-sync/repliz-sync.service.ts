@@ -13,9 +13,18 @@ import {
   downloadToPublicDir,
 } from './worker/public-media.util';
 
+export type RunTargetResult = {
+  targetUsername: string;
+  scraped: number;
+  fresh: number;
+  scheduled: number;
+  failed: number;
+  error?: string;
+};
+
 export type RunRuleResult = {
   ruleId: string;
-  targetUsername: string;
+  targets: RunTargetResult[];
   scraped: number;
   fresh: number;
   scheduled: number;
@@ -75,10 +84,7 @@ export class ReplizSyncService {
   // Kalau jam itu sudah lewat (mis. cron telat / run manual siang hari),
   // titik mulai digeser ke sekarang + 1 interval supaya Repliz tidak
   // menerima jadwal di masa lalu yang akan langsung terbit sekaligus.
-  private buildScheduleTimes(
-    rule: ReplizSyncRuleEntity,
-    count: number,
-  ): Date[] {
+  private scheduleTimeAt(rule: ReplizSyncRuleEntity, slotIndex: number): Date {
     const [hour, minute] = rule.scheduleStartTime
       .split(':')
       .map((value) => Number(value));
@@ -92,10 +98,7 @@ export class ReplizSyncService {
       start.setTime(now + intervalMs);
     }
 
-    return Array.from(
-      { length: count },
-      (_, index) => new Date(start.getTime() + index * intervalMs),
-    );
+    return new Date(start.getTime() + slotIndex * intervalMs);
   }
 
   async runRule(ruleId: string): Promise<RunRuleResult> {
@@ -107,106 +110,161 @@ export class ReplizSyncService {
     assertPublicBaseUrlUsable();
 
     const browsingAccount = await this.resolveBrowsingAccount();
+    const targets = rule.targetUsernames ?? [];
 
-    const alreadySynced = await this.syncedRepo.find({
-      where: { ruleId: rule.id },
-      select: { shortcode: true },
-    });
-    const excludeShortcodes = new Set(
-      alreadySynced.map((row) => row.shortcode),
-    );
+    // Jadwal disusun lintas-target dalam satu rule, bukan diulang dari jam
+    // mulai untuk tiap target — kalau tiap target mulai dari 06:00 lagi,
+    // konten dari beberapa target akan bertumpuk pada jam yang sama.
+    let slotIndex = 0;
+    const results: RunTargetResult[] = [];
 
-    const posts = await scrapeLatestInstagramPosts(
-      browsingAccount,
-      rule.targetUsername,
-      rule.maxItems,
-      excludeShortcodes,
-      rule.scrapeMode,
-    );
-
-    const fresh = posts.filter(
-      (post) => !excludeShortcodes.has(post.shortcode),
-    );
-
-    const scheduleTimes = this.buildScheduleTimes(rule, fresh.length);
-    let scheduled = 0;
-    let failed = 0;
-
-    for (const [index, post] of fresh.entries()) {
-      const scheduledAt = scheduleTimes[index];
-
+    for (const targetUsername of targets) {
       try {
-        const media = await downloadToPublicDir(post.mediaUrl);
-        const publicUrl = buildPublicUrl(media.publicPath);
-
-        const result = await this.replizService.createSchedule({
-          accountId: rule.replizAccountId,
-          title: '',
-          description: post.caption ?? '',
-          type: post.isVideo ? 'video' : 'image',
-          medias: [
-            {
-              url: publicUrl,
-              type: post.isVideo ? 'video' : 'image',
-            },
-          ],
-          scheduleAt: scheduledAt.toISOString(),
+        const alreadySynced = await this.syncedRepo.find({
+          where: { ruleId: rule.id, targetUsername },
+          select: { shortcode: true },
         });
-
-        await this.syncedRepo.save(
-          this.syncedRepo.create({
-            ruleId: rule.id,
-            shortcode: post.shortcode,
-            postUrl: `https://www.instagram.com/p/${post.shortcode}/`,
-            caption: post.caption ?? null,
-            mediaUrl: publicUrl,
-            isVideo: post.isVideo,
-            replizScheduleId: result.scheduleId,
-            scheduledAt,
-            status: 'scheduled',
-          }),
+        const excludeShortcodes = new Set(
+          alreadySynced.map((row) => row.shortcode),
         );
-        scheduled += 1;
+
+        const posts = await scrapeLatestInstagramPosts(
+          browsingAccount,
+          targetUsername,
+          rule.maxItems,
+          excludeShortcodes,
+          rule.scrapeMode,
+        );
+
+        const fresh = posts.filter(
+          (post) => !excludeShortcodes.has(post.shortcode),
+        );
+
+        let scheduled = 0;
+        let failed = 0;
+
+        for (const post of fresh) {
+          const scheduledAt = this.scheduleTimeAt(rule, slotIndex);
+          slotIndex += 1;
+
+          try {
+            const media = await downloadToPublicDir(post.mediaUrl);
+            const publicUrl = buildPublicUrl(media.publicPath);
+
+            const result = await this.replizService.createSchedule({
+              accountId: rule.replizAccountId,
+              title: '',
+              description: post.caption ?? '',
+              type: post.isVideo ? 'video' : 'image',
+              medias: [
+                {
+                  url: publicUrl,
+                  type: post.isVideo ? 'video' : 'image',
+                },
+              ],
+              scheduleAt: scheduledAt.toISOString(),
+            });
+
+            await this.syncedRepo.save(
+              this.syncedRepo.create({
+                ruleId: rule.id,
+                targetUsername,
+                shortcode: post.shortcode,
+                postUrl: `https://www.instagram.com/p/${post.shortcode}/`,
+                caption: post.caption ?? null,
+                mediaUrl: publicUrl,
+                isVideo: post.isVideo,
+                replizScheduleId: result.scheduleId,
+                scheduledAt,
+                status: 'scheduled',
+              }),
+            );
+            scheduled += 1;
+          } catch (error) {
+            const message =
+              error instanceof Error
+                ? error.message
+                : 'Gagal memproses konten';
+            this.logger.error(
+              `Rule ${rule.id} (@${targetUsername}) gagal memproses ${post.shortcode}: ${message}`,
+            );
+
+            // Kegagalan tetap dicatat supaya konten yang sama tidak dicoba
+            // berulang tiap hari; status 'failed' membedakannya dari yang
+            // benar-benar terjadwal saat ditinjau di UI.
+            await this.syncedRepo.save(
+              this.syncedRepo.create({
+                ruleId: rule.id,
+                targetUsername,
+                shortcode: post.shortcode,
+                postUrl: `https://www.instagram.com/p/${post.shortcode}/`,
+                caption: post.caption ?? null,
+                isVideo: post.isVideo,
+                status: 'failed',
+                errorMessage: message,
+              }),
+            );
+            failed += 1;
+          }
+        }
+
+        results.push({
+          targetUsername,
+          scraped: posts.length,
+          fresh: fresh.length,
+          scheduled,
+          failed,
+        });
       } catch (error) {
+        // Satu target gagal (mis. akun private / tidak ada) tidak boleh
+        // menggagalkan target lain dalam rule yang sama.
         const message =
-          error instanceof Error ? error.message : 'Gagal memproses konten';
-        this.logger.error(
-          `Rule ${rule.id} gagal memproses ${post.shortcode}: ${message}`,
-        );
-
-        // Kegagalan tetap dicatat supaya konten yang sama tidak dicoba
-        // berulang tiap hari; status 'failed' membedakannya dari yang
-        // benar-benar terjadwal saat ditinjau di UI.
-        await this.syncedRepo.save(
-          this.syncedRepo.create({
-            ruleId: rule.id,
-            shortcode: post.shortcode,
-            postUrl: `https://www.instagram.com/p/${post.shortcode}/`,
-            caption: post.caption ?? null,
-            isVideo: post.isVideo,
-            status: 'failed',
-            errorMessage: message,
-          }),
-        );
-        failed += 1;
+          error instanceof Error ? error.message : 'Gagal memproses target';
+        this.logger.error(`Rule ${rule.id} (@${targetUsername}): ${message}`);
+        results.push({
+          targetUsername,
+          scraped: 0,
+          fresh: 0,
+          scheduled: 0,
+          failed: 0,
+          error: message,
+        });
       }
     }
 
-    const message = `Scrape ${posts.length}, baru ${fresh.length}, terjadwal ${scheduled}, gagal ${failed}`;
+    const total = results.reduce(
+      (acc, r) => ({
+        scraped: acc.scraped + r.scraped,
+        fresh: acc.fresh + r.fresh,
+        scheduled: acc.scheduled + r.scheduled,
+        failed: acc.failed + r.failed,
+      }),
+      { scraped: 0, fresh: 0, scheduled: 0, failed: 0 },
+    );
+
+    const errored = results.filter((r) => r.error);
+    const message =
+      `${targets.length} target: scrape ${total.scraped}, baru ${total.fresh}, ` +
+      `terjadwal ${total.scheduled}, gagal ${total.failed}` +
+      (errored.length
+        ? ` — ${errored.length} target error (${errored
+            .map((r) => `@${r.targetUsername}`)
+            .join(', ')})`
+        : '');
 
     await this.ruleRepo.update(rule.id, {
       lastRunAt: new Date(),
-      lastRunStatus: failed > 0 && scheduled === 0 ? 'failed' : 'success',
+      lastRunStatus:
+        total.scheduled === 0 && (total.failed > 0 || errored.length > 0)
+          ? 'failed'
+          : 'success',
       lastRunMessage: message,
     });
 
     return {
       ruleId: rule.id,
-      targetUsername: rule.targetUsername,
-      scraped: posts.length,
-      fresh: fresh.length,
-      scheduled,
-      failed,
+      targets: results,
+      ...total,
       message,
     };
   }

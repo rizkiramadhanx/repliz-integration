@@ -240,15 +240,25 @@ export default function PageReplizSync() {
               >
                 <Table.Td>{rule.label}</Table.Td>
                 <Table.Td>
-                  <Anchor
-                    href={`https://www.instagram.com/${rule.targetUsername}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    size="sm"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    @{rule.targetUsername}
-                  </Anchor>
+                  <Group gap={6} wrap="wrap">
+                    {(rule.targetUsernames ?? []).map((username) => (
+                      <Anchor
+                        key={username}
+                        href={`https://www.instagram.com/${username}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        size="sm"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        @{username}
+                      </Anchor>
+                    ))}
+                    {(rule.targetUsernames ?? []).length === 0 && (
+                      <Text size="sm" c="dimmed">
+                        -
+                      </Text>
+                    )}
+                  </Group>
                 </Table.Td>
                 <Table.Td>
                   <Text size="sm">{rule.replizAccountLabel ?? "-"}</Text>
@@ -450,6 +460,7 @@ export default function PageReplizSync() {
                   />
                 </Table.Th>
                 <Table.Th>Konten</Table.Th>
+                <Table.Th>Target</Table.Th>
                 <Table.Th>Caption</Table.Th>
                 <Table.Th>Dijadwalkan</Table.Th>
                 <Table.Th>Status</Table.Th>
@@ -458,7 +469,7 @@ export default function PageReplizSync() {
             <Table.Tbody>
               {isSyncedError && (
                 <Table.Tr>
-                  <Table.Td colSpan={5}>
+                  <Table.Td colSpan={6}>
                     <Text ta="center" c="red" py={16}>
                       {syncedErrorMessage}
                     </Text>
@@ -468,7 +479,7 @@ export default function PageReplizSync() {
 
               {!isSyncedError && syncedPosts.length === 0 && (
                 <Table.Tr>
-                  <Table.Td colSpan={5}>
+                  <Table.Td colSpan={6}>
                     <Text ta="center" c="dimmed" py={16}>
                       {dateFrom || dateTo || statusFilter || selectedRuleId
                         ? "Tidak ada konten yang cocok dengan filter"
@@ -507,6 +518,11 @@ export default function PageReplizSync() {
                     )}
                     <Text size="xs" c="dimmed">
                       {post.isVideo ? "video" : "image"}
+                    </Text>
+                  </Table.Td>
+                  <Table.Td>
+                    <Text size="xs">
+                      {post.targetUsername ? `@${post.targetUsername}` : "-"}
                     </Text>
                   </Table.Td>
                   <Table.Td>

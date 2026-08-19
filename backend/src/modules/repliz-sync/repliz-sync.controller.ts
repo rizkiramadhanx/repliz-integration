@@ -30,11 +30,8 @@ import { ReplizSyncedPostEntity } from './entities/repliz-synced-post.entity';
 import {
   CreateReplizSyncRuleDto,
   UpdateReplizSyncRuleDto,
+  normalizeUsernames,
 } from './dto/repliz-sync.dto';
-
-function normalizeUsername(username: string): string {
-  return username.trim().replace(/^@/, '');
-}
 
 @Controller('repliz-sync')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
@@ -62,22 +59,48 @@ export class ReplizSyncController {
     @Body() dto: CreateReplizSyncRuleDto,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const targetUsername = normalizeUsername(dto.targetUsername);
-
-    const existing = await this.ruleRepo.findOne({ where: { targetUsername } });
-    if (existing) {
+    const targetUsernames = normalizeUsernames(dto.targetUsernames);
+    if (targetUsernames.length === 0) {
       res.status(HttpStatus.BAD_REQUEST);
       return createErrorResponse(
-        `Target @${targetUsername} sudah terdaftar`,
+        'Minimal satu akun target (z) harus diisi',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    // Target yang sudah dipakai rule lain ditolak, karena mengkloning satu
+    // akun dari dua rule berbeda akan menjadwalkan konten yang sama dua kali
+    // di Repliz (anti-duplikat dipisah per rule).
+    const duplicated = await this.findDuplicatedTargets(targetUsernames);
+    if (duplicated.length > 0) {
+      res.status(HttpStatus.BAD_REQUEST);
+      return createErrorResponse(
+        `Target sudah terdaftar di rule lain: ${duplicated
+          .map((t) => `@${t}`)
+          .join(', ')}`,
         HttpStatus.BAD_REQUEST,
       );
     }
 
     const rule = await this.ruleRepo.save(
-      this.ruleRepo.create({ ...dto, targetUsername }),
+      this.ruleRepo.create({ ...dto, targetUsernames }),
     );
     res.status(HttpStatus.CREATED);
     return createSuccessResponse('Rule berhasil dibuat', rule);
+  }
+
+  private async findDuplicatedTargets(
+    targets: string[] = [],
+    excludeRuleId?: string,
+  ): Promise<string[]> {
+    if (targets.length === 0) return [];
+    const rules = await this.ruleRepo.find();
+    const taken = new Set(
+      rules
+        .filter((r) => r.id !== excludeRuleId)
+        .flatMap((r) => r.targetUsernames ?? []),
+    );
+    return targets.filter((t) => taken.has(t));
   }
 
   @Patch('rule/:id')
@@ -93,9 +116,29 @@ export class ReplizSyncController {
       return createErrorResponse('Rule tidak ditemukan', HttpStatus.NOT_FOUND);
     }
 
-    const payload = { ...dto };
-    if (payload.targetUsername) {
-      payload.targetUsername = normalizeUsername(payload.targetUsername);
+    const payload: Record<string, unknown> = { ...dto };
+
+    if (dto.targetUsernames !== undefined) {
+      const targetUsernames = normalizeUsernames(dto.targetUsernames);
+      if (targetUsernames.length === 0) {
+        res.status(HttpStatus.BAD_REQUEST);
+        return createErrorResponse(
+          'Minimal satu akun target (z) harus diisi',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      const duplicated = await this.findDuplicatedTargets(targetUsernames, id);
+      if (duplicated.length > 0) {
+        res.status(HttpStatus.BAD_REQUEST);
+        return createErrorResponse(
+          `Target sudah terdaftar di rule lain: ${duplicated
+            .map((t) => `@${t}`)
+            .join(', ')}`,
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+      payload.targetUsernames = targetUsernames;
     }
 
     await this.ruleRepo.update(id, payload);

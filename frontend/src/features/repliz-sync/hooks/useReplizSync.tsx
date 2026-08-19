@@ -70,7 +70,7 @@ export function useGetSyncedPost(filter: typeSyncedPostFilter = {}) {
 
 export type typeCreateSyncRulePayload = {
   label: string;
-  targetUsername: string;
+  targetUsernames: string[];
   replizAccountId: string;
   replizAccountLabel?: string;
   maxItems?: number;

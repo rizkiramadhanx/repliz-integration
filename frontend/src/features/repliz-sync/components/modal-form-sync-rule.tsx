@@ -11,6 +11,7 @@ import {
   NumberInput,
   Select,
   Stack,
+  TagsInput,
   TextInput,
 } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
@@ -32,7 +33,7 @@ export default function ModalFormSyncRule({
   const isEdit = Boolean(rule);
 
   const [label, setLabel] = useState("");
-  const [targetUsername, setTargetUsername] = useState("");
+  const [targetUsernames, setTargetUsernames] = useState<string[]>([]);
   const [replizAccountId, setReplizAccountId] = useState<string | null>(null);
   const [maxItems, setMaxItems] = useState<number | string>(25);
   const [scheduleStartTime, setScheduleStartTime] = useState("06:00");
@@ -56,7 +57,7 @@ export default function ModalFormSyncRule({
   useEffect(() => {
     if (!open) return;
     setLabel(rule?.label ?? "");
-    setTargetUsername(rule?.targetUsername ?? "");
+    setTargetUsernames(rule?.targetUsernames ?? []);
     setReplizAccountId(rule?.replizAccountId ?? null);
     setMaxItems(rule?.maxItems ?? 25);
     setScheduleStartTime(rule?.scheduleStartTime ?? "06:00");
@@ -66,7 +67,7 @@ export default function ModalFormSyncRule({
   }, [open, rule]);
 
   const handleSubmit = () => {
-    if (!label.trim() || !targetUsername.trim() || !replizAccountId) {
+    if (!label.trim() || targetUsernames.length === 0 || !replizAccountId) {
       notifications.show({
         title: "Lengkapi form",
         message: "Label, akun target, dan akun Repliz wajib diisi",
@@ -78,7 +79,7 @@ export default function ModalFormSyncRule({
     const selected = replizAccounts.find((a) => a.id === replizAccountId);
     const payload = {
       label: label.trim(),
-      targetUsername: targetUsername.trim(),
+      targetUsernames,
       replizAccountId,
       replizAccountLabel: selected
         ? `@${selected.username} (${selected.type})`
@@ -132,12 +133,25 @@ export default function ModalFormSyncRule({
           onChange={(e) => setLabel(e.currentTarget.value)}
           required
         />
-        <TextInput
+        <TagsInput
           label="Akun target (z) yang dikloning"
-          placeholder="mis. clipcraftcom"
-          description="Username Instagram tanpa @"
-          value={targetUsername}
-          onChange={(e) => setTargetUsername(e.currentTarget.value)}
+          placeholder="Ketik username lalu Enter atau koma"
+          description="Username Instagram tanpa @. Bisa lebih dari satu — pisahkan dengan Enter atau koma."
+          data={[]}
+          value={targetUsernames}
+          onChange={(values) =>
+            setTargetUsernames(
+              Array.from(
+                new Set(
+                  values
+                    .map((v) => v.trim().replace(/^@+/, ""))
+                    .filter(Boolean),
+                ),
+              ),
+            )
+          }
+          splitChars={[",", " "]}
+          clearable
           required
         />
         <Select

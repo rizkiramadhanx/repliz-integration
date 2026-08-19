@@ -1,7 +1,7 @@
 export type typeDataReplizSyncRule = {
   id: string;
   label: string;
-  targetUsername: string;
+  targetUsernames: string[];
   replizAccountId: string;
   replizAccountLabel: string | null;
   maxItems: number;
@@ -19,6 +19,7 @@ export type typeDataReplizSyncRule = {
 export type typeDataReplizSyncedPost = {
   id: string;
   ruleId: string;
+  targetUsername: string;
   shortcode: string;
   postUrl: string | null;
   caption: string | null;
@@ -31,9 +32,18 @@ export type typeDataReplizSyncedPost = {
   createdAt: string;
 };
 
+export type typeDataRunTargetResult = {
+  targetUsername: string;
+  scraped: number;
+  fresh: number;
+  scheduled: number;
+  failed: number;
+  error?: string;
+};
+
 export type typeDataRunRuleResult = {
   ruleId: string;
-  targetUsername: string;
+  targets: typeDataRunTargetResult[];
   scraped: number;
   fresh: number;
   scheduled: number;
