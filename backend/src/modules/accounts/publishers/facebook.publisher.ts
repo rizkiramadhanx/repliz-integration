@@ -153,7 +153,9 @@ async function fillComposerAndSubmit(
   }
 
   const postButton = dialog
-    .locator('[aria-label="Post"], [aria-label="Kirim"], [aria-label="Posting"]')
+    .locator(
+      '[aria-label="Post"], [aria-label="Kirim"], [aria-label="Posting"]',
+    )
     .first();
   await postButton.waitFor({ timeout: 15000 });
   await postButton.click();
