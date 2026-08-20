@@ -242,6 +242,7 @@ docker logs -f traefik-manual-traefik-1     # routing & TLS
 | Sertifikat TLS tidak terbit | DNS belum propagasi, atau port 80 tertutup (Let's Encrypt pakai HTTP challenge) |
 | `PUBLIC_BASE_URL ... mengarah ke localhost` | Isi `BACKEND_DOMAIN` dengan domain publik, bukan localhost |
 | Sinkronisasi gagal unduh media | Cek `https://api.domain.com/uploads/` bisa diakses dari luar VPS |
+| **Halaman reload terus-menerus** (redirect loop) | Cloudflare SSL/TLS mode `Flexible`. Cloudflare konek ke VPS lewat HTTP, Traefik balas 301 ke HTTPS, Cloudflare teruskan ke browser, berulang. Set ke **Full (strict)** di dashboard Cloudflare → SSL/TLS → Overview |
 | **Semua domain balas 404** `page not found` (dari Traefik, bukan koneksi gagal) | Log Traefik memuat `client version 1.24 is too old`. Docker Engine 29+ menaikkan minimum API ke 1.44, Traefik ≤3.5 masih memakai 1.24 sehingga tidak pernah membaca label container. Pakai `traefik:v3.6.1` ke atas, lalu `docker compose -f docker-compose.traefik.yml up -d --force-recreate` |
 | `ERR_SSL_PROTOCOL_ERROR` pada URL media | `PUBLIC_BASE_URL` memakai https + port aplikasi (mis. `:4000`). Hapus portnya — TLS ada di 443 lewat Traefik |
 | Menu baru tidak muncul di sidebar | Logout–login ulang; permission disimpan di sesi saat login |
