@@ -1,12 +1,19 @@
 services:
   traefik:
-    image: traefik:v3.5
+    image: traefik:v3.6.1
     restart: unless-stopped
     environment:
-      # Docker SDK bawaan image Traefik defaultnya minta API version lama (1.24)
-      # yang ditolak Docker daemon versi baru (minimum 1.40) — tanpa ini Traefik
-      # gagal total konek ke docker.sock, jadi tidak pernah baca label container apa
-      # pun (semua domain selalu 404, bukan soal network/label yang salah).
+      # Docker Engine 29+ menaikkan minimum API version ke 1.44, sedangkan
+      # Traefik <=3.5 memakai Docker SDK yang defaultnya masih 1.24 — akibatnya
+      # Traefik gagal total konek ke docker.sock dan tidak pernah membaca label
+      # container apa pun (gejalanya SEMUA domain balas 404 "page not found"
+      # dari Traefik, bukan koneksi gagal, sehingga mudah dikira salah
+      # network/label).
+      #
+      # Traefik 3.6.1 memperbaikinya dengan negosiasi versi API otomatis.
+      # DOCKER_API_VERSION tetap dipasang sebagai jaring pengaman untuk daemon
+      # yang tidak mendukung negosiasi; pada 3.5 env ini TIDAK berpengaruh
+      # (terbukti errornya tetap muncul), jadi upgrade image-nya yang wajib.
       - DOCKER_API_VERSION=1.44
     command:
       - --providers.docker=true
