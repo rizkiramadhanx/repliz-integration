@@ -345,6 +345,21 @@ redeploy biasa**, tetapi `docker compose down -v` akan **menghapusnya
 permanen**. Bila ada konten yang sudah terjadwal di Repliz namun filenya
 hilang, postingan tersebut akan gagal terbit.
 
+### Membersihkan media yatim
+
+Menghapus jadwal di Repliz **tidak** ikut menghapus berkas medianya, jadi
+volume terus bertumbuh. Script berikut hanya menghapus berkas yang sudah
+tidak dirujuk jadwal mana pun:
+
+```bash
+./scripts/bersihkan-media-yatim.sh            # tampilkan saja (aman)
+./scripts/bersihkan-media-yatim.sh --hapus    # benar-benar hapus
+```
+
+Tanpa `--hapus` tidak ada berkas yang disentuh. Script berhenti sendiri
+bila daftar jadwal gagal dibaca, supaya kegagalan koneksi tidak disalah-
+artikan sebagai "tidak ada berkas yang dipakai".
+
 Backup berkala:
 
 ```bash
