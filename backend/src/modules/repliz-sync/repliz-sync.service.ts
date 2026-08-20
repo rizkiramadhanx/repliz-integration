@@ -12,6 +12,7 @@ import { scrapeLatestInstagramPosts } from './worker/instagram-scraper.util';
 import { scrapeLatestFacebookPosts } from './worker/facebook-scraper.util';
 import {
   assertPublicBaseUrlUsable,
+  REPLIZ_MEDIA_SUBDIR,
   buildPublicUrl,
   downloadToPublicDir,
 } from './worker/public-media.util';
@@ -224,8 +225,17 @@ export class ReplizSyncService {
           slotIndex += 1;
 
           try {
-            const media = await downloadToPublicDir(post.mediaUrl);
-            const publicUrl = buildPublicUrl(media.publicPath);
+            // Scraper Facebook bisa mengembalikan URL yang SUDAH menunjuk ke
+            // direktori media kita sendiri (hasil penggabungan video+audio
+            // dengan ffmpeg). Mengunduhnya lagi hanya menggandakan berkas,
+            // jadi URL seperti itu dipakai apa adanya.
+            const publicUrl = post.mediaUrl.includes(
+              `/uploads/${REPLIZ_MEDIA_SUBDIR}/`,
+            )
+              ? post.mediaUrl
+              : buildPublicUrl(
+                  (await downloadToPublicDir(post.mediaUrl)).publicPath,
+                );
 
             const result = await this.replizService.createSchedule({
               accountId: rule.replizAccountId,
