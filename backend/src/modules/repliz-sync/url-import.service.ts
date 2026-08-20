@@ -72,8 +72,32 @@ export class UrlImportService {
         ),
       ]);
 
+    // Layanan downloader (tikwm) kerap memutus koneksi di tengah respons
+    // ("Premature close") atau mengembalikan data kosong. Kegagalannya
+    // sementara: URL yang sama biasanya berhasil pada percobaan berikutnya,
+    // jadi dicoba ulang beberapa kali sebelum dianggap gagal.
+    const withRetry = async <T>(
+      factory: () => Promise<T>,
+      attempts = 3,
+    ): Promise<T> => {
+      let lastError: unknown;
+      for (let attempt = 1; attempt <= attempts; attempt += 1) {
+        try {
+          return await withTimeout(factory());
+        } catch (error) {
+          lastError = error;
+          if (attempt < attempts) {
+            // Jeda bertambah tiap percobaan agar tidak membebani layanan
+            // yang sedang bermasalah.
+            await new Promise((resolve) => setTimeout(resolve, attempt * 2000));
+          }
+        }
+      }
+      throw lastError;
+    };
+
     if (platform === 'tiktok') {
-      const data = await withTimeout(scraper.ttdl(url));
+      const data = await withRetry(() => scraper.ttdl(url));
       // `video` (H.264) diutamakan daripada `video_hd` yang memakai HEVC —
       // HEVC tidak didukung banyak pemutar dan berisiko ditolak Repliz.
       // `video_wm` tidak dipakai karena memuat watermark.
@@ -82,7 +106,7 @@ export class UrlImportService {
       return { mediaUrl, caption: data?.title ?? '', isVideo: true };
     }
 
-    const urls = await withTimeout(
+    const urls = await withRetry(() =>
       platform === 'instagram' ? scraper.igdl(url) : scraper.fbdl(url),
     );
     const mediaUrl = Array.isArray(urls)
