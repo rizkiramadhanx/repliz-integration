@@ -573,6 +573,26 @@ export async function scrapeLatestFacebookPosts(
     const posts: ScrapedFacebookPost[] = [];
     for (const link of links) {
       try {
+        // Untuk reel, membuka halaman detail tidak diperlukan: downloader
+        // hanya butuh id postingan, dan satu-satunya data tambahan dari
+        // halaman itu adalah caption — yang pada reel hampir selalu kosong.
+        // Melewatinya memangkas ~5 detik per konten.
+        if (scrapeMode === 'reels' && link.isVideo) {
+          const fastUrl = await fetchDownloaderVideoUrl(link.postId);
+          if (fastUrl) {
+            posts.push({
+              postId: link.postId,
+              caption: '',
+              mediaUrl: fastUrl,
+              isVideo: true,
+              thumbnailUrl: null,
+              postUrl: link.href,
+            });
+            continue;
+          }
+          // Downloader gagal — jatuh ke jalur lengkap yang membuka halaman.
+        }
+
         const post = await scrapePostDetail(page, link);
         // Postingan tanpa media (status teks saja) dilewati: Repliz butuh
         // medias[] untuk tipe image/video, dan tipe `text` hanya didukung
