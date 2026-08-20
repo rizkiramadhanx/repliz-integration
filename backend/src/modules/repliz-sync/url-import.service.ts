@@ -155,7 +155,12 @@ export class UrlImportService {
     const body = (await response.json()) as {
       code?: number;
       msg?: string;
-      data?: { play?: string; hdplay?: string; title?: string };
+      data?: {
+        play?: string;
+        hdplay?: string;
+        title?: string;
+        content_desc?: string | string[];
+      };
     };
 
     if (body?.code !== 0 || !body?.data) {
@@ -172,9 +177,31 @@ export class UrlImportService {
       mediaUrl: mediaUrl.startsWith('http')
         ? mediaUrl
         : `https://www.tikwm.com${mediaUrl}`,
-      caption: body.data.title ?? '',
+      // Sebagian video mengisi `content_desc` tapi tidak `title` (atau
+      // sebaliknya), jadi keduanya dipakai bergantian. `content_desc` bisa
+      // berupa array (potongan teks) maupun string, jadi bentuknya
+      // dinormalkan lebih dulu. Video tanpa caption sama sekali memang ada —
+      // hasilnya kosong, bukan kegagalan.
+      caption: this.normalizeCaption(body.data.title, body.data.content_desc),
       isVideo: true,
     };
+  }
+
+  private normalizeCaption(
+    title?: string,
+    contentDesc?: string | string[],
+  ): string {
+    const fromTitle = typeof title === 'string' ? title.trim() : '';
+    if (fromTitle) return fromTitle;
+
+    if (Array.isArray(contentDesc)) {
+      return contentDesc
+        .filter((part) => typeof part === 'string')
+        .join(' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+    }
+    return typeof contentDesc === 'string' ? contentDesc.trim() : '';
   }
 
   // Menghitung berapa konten yang SUDAH terjadwal per tanggal pada akun
