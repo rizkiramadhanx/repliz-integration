@@ -13,6 +13,7 @@ export type typeImportUrlResult = {
 export type typeImportUrlsPayload = {
   urls: string;
   replizAccountId: string;
+  startDate?: string;
   startTime?: string;
   intervalMinutes?: number;
 };

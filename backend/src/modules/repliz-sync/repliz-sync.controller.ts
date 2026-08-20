@@ -213,6 +213,7 @@ export class ReplizSyncController {
     body: {
       urls?: string[] | string;
       replizAccountId?: string;
+      startDate?: string;
       startTime?: string;
       intervalMinutes?: number;
     },
@@ -249,6 +250,7 @@ export class ReplizSyncController {
       const results = await this.urlImportService.importUrls({
         urls,
         replizAccountId: body.replizAccountId,
+        startDate: body.startDate,
         startTime: body.startTime,
         intervalMinutes: body.intervalMinutes,
       });

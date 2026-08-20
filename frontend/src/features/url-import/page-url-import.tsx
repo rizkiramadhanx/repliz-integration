@@ -16,6 +16,7 @@ import {
   Table,
   Text,
   Textarea,
+  TextInput,
 } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { useState } from "react";
@@ -34,11 +35,23 @@ function accountLabel(account: {
   return `${displayName} (${account.type ?? "-"})`;
 }
 
+// Selaras dengan MAX_URLS_PER_IMPORT di backend; ditegakkan di kedua sisi
+// supaya pengguna diperingatkan sebelum menunggu lama, bukan setelahnya.
+const MAX_URLS = 100;
+
 export default function PageUrlImport() {
   const navigate = useNavigate();
 
   const [urls, setUrls] = useState("");
   const [replizAccountId, setReplizAccountId] = useState<string | null>(null);
+  // Default hari ini dalam waktu lokal — toISOString() memakai UTC dan bisa
+  // meleset satu hari bagi pengguna di zona waktu timur.
+  const [startDate, setStartDate] = useState(() => {
+    const now = new Date();
+    const month = String(now.getMonth() + 1).padStart(2, "0");
+    const day = String(now.getDate()).padStart(2, "0");
+    return `${now.getFullYear()}-${month}-${day}`;
+  });
   const [startTime, setStartTime] = useState("06:00");
   const [intervalMinutes, setIntervalMinutes] = useState<number | string>(60);
   const [results, setResults] = useState<typeImportUrlResult[]>([]);
@@ -78,6 +91,7 @@ export default function PageUrlImport() {
       {
         urls,
         replizAccountId,
+        startDate,
         startTime,
         intervalMinutes: Number(intervalMinutes) || 60,
       },
@@ -149,6 +163,15 @@ export default function PageUrlImport() {
         maxRows={14}
       />
 
+      {urlCount > MAX_URLS && (
+        <Alert color="orange" variant="light" mt={12}>
+          Terdeteksi <b>{urlCount} URL</b>, melebihi batas {MAX_URLS} per sekali
+          impor. Tiap URL perlu mengunduh media dan memanggil Repliz, jadi
+          batch yang terlalu besar membuat prosesnya sangat lama. Bagi menjadi
+          beberapa batch.
+        </Alert>
+      )}
+
       <Group grow mt={12} align="flex-start">
         <Select
           label="Posting ke akun Repliz"
@@ -162,14 +185,17 @@ export default function PageUrlImport() {
           searchable
           required
         />
-        <Textarea
-          label="Mulai posting"
-          description="Format HH:mm"
+        <TextInput
+          label="Tanggal mulai"
+          type="date"
+          value={startDate}
+          onChange={(e) => setStartDate(e.currentTarget.value)}
+        />
+        <TextInput
+          label="Jam mulai"
+          type="time"
           value={startTime}
           onChange={(e) => setStartTime(e.currentTarget.value)}
-          autosize
-          minRows={1}
-          maxRows={1}
         />
         <NumberInput
           label="Jeda antar konten (menit)"
@@ -183,7 +209,7 @@ export default function PageUrlImport() {
         <Button
           onClick={handleSubmit}
           loading={isPending}
-          disabled={urlCount === 0 || !replizAccountId}
+          disabled={urlCount === 0 || urlCount > MAX_URLS || !replizAccountId}
           color="primary"
         >
           Jadwalkan {urlCount > 0 ? `${urlCount} konten` : ""}

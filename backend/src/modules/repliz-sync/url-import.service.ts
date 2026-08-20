@@ -19,6 +19,9 @@ export type ImportUrlResult = {
 export type ImportUrlsParams = {
   urls: string[];
   replizAccountId: string;
+  // Tanggal mulai (YYYY-MM-DD). Bila kosong, dipakai hari ini — dan digeser
+  // ke besok bila jam mulainya sudah lewat.
+  startDate?: string;
   startTime?: string;
   intervalMinutes?: number;
 };
@@ -33,6 +36,11 @@ type ResolvedMedia = {
 // tanpa batas ini rangkaian akan melewati tengah malam dan tumpah ke tanggal
 // berikutnya di tengah jalan.
 const MAX_SLOTS_PER_DAY = 24;
+
+// Batas URL per satu kali impor. Tiap URL memerlukan unduhan media dan satu
+// panggilan ke Repliz, jadi ratusan URL sekaligus membuat request menggantung
+// sangat lama dan sulit dipantau. Sisanya bisa diimpor pada batch berikutnya.
+const MAX_URLS_PER_IMPORT = 100;
 
 @Injectable()
 export class UrlImportService {
@@ -213,15 +221,23 @@ export class UrlImportService {
   ): Promise<Map<string, number>> {
     const counts = new Map<string, number>();
     try {
-      const list = await this.replizService.listSchedules({
-        page: 1,
-        limit: 200,
-        accountIds: [replizAccountId],
-      });
+      // Diambil berhalaman: satu akun bisa punya ratusan jadwal, dan
+      // membaca hanya halaman pertama membuat hitungan slot terpakai
+      // meleset sehingga batas harian bocor.
+      const MAX_PAGES = 10;
+      for (let page = 1; page <= MAX_PAGES; page += 1) {
+        const list = await this.replizService.listSchedules({
+          page,
+          limit: 200,
+          accountIds: [replizAccountId],
+        });
 
-      for (const item of list.docs ?? []) {
-        const date = this.dateKey(new Date(item.scheduleAt));
-        counts.set(date, (counts.get(date) ?? 0) + 1);
+        for (const item of list.docs ?? []) {
+          const date = this.dateKey(new Date(item.scheduleAt));
+          counts.set(date, (counts.get(date) ?? 0) + 1);
+        }
+
+        if (!list.hasNextPage) break;
       }
     } catch (error) {
       // Gagal membaca jadwal bukan alasan membatalkan impor: batas harian
@@ -246,6 +262,7 @@ export class UrlImportService {
     startTime: string,
     intervalMinutes: number,
     slotIndex: number,
+    startDate?: string,
   ): Date {
     const [hour, minute] = startTime.split(':').map((v) => Number(v));
     const intervalMs = intervalMinutes * 60 * 1000;
@@ -261,11 +278,20 @@ export class UrlImportService {
     const slotInDay = slotIndex % slotsPerDay;
 
     const start = new Date();
+
+    // Tanggal mulai eksplisit dipakai apa adanya; tanpa itu dipakai hari ini.
+    // Dibangun lewat setFullYear agar tetap waktu LOKAL — `new Date('YYYY-MM-DD')`
+    // diperlakukan sebagai UTC dan bisa meleset satu hari.
+    if (startDate && /^\d{4}-\d{2}-\d{2}$/.test(startDate)) {
+      const [year, month, day] = startDate.split('-').map((v) => Number(v));
+      start.setFullYear(year, month - 1, day);
+    }
     start.setHours(hour || 0, minute || 0, 0, 0);
 
-    // Jam mulai yang sudah lewat digeser ke hari berikutnya pada jam yang
-    // sama, bukan ke "sekarang + interval", supaya jam terbitnya konsisten.
-    const baseDayOffset = start.getTime() <= Date.now() ? 1 : 0;
+    // Hanya digeser ke besok bila tanggalnya TIDAK ditentukan pengguna:
+    // kalau pengguna memilih tanggal, keinginannya harus dihormati apa adanya.
+    const baseDayOffset =
+      !startDate && start.getTime() <= Date.now() ? 1 : 0;
     start.setDate(start.getDate() + baseDayOffset + dayOffset);
 
     return new Date(start.getTime() + slotInDay * intervalMs);
@@ -275,6 +301,7 @@ export class UrlImportService {
     const {
       urls,
       replizAccountId,
+      startDate,
       startTime = '06:00',
       intervalMinutes = 60,
     } = params;
@@ -282,6 +309,12 @@ export class UrlImportService {
     // Dicek lebih dulu supaya tidak mengunduh apa pun bila URL medianya
     // nanti tidak bisa dijangkau server Repliz.
     assertPublicBaseUrlUsable();
+
+    if (urls.length > MAX_URLS_PER_IMPORT) {
+      throw new Error(
+        `Terlalu banyak URL (${urls.length}). Maksimal ${MAX_URLS_PER_IMPORT} per sekali impor — bagi menjadi beberapa batch.`,
+      );
+    }
 
     const results: ImportUrlResult[] = [];
 
@@ -309,6 +342,7 @@ export class UrlImportService {
           startTime,
           intervalMinutes,
           slotIndex,
+          startDate,
         );
         while (
           (usedPerDay.get(this.dateKey(scheduledAt)) ?? 0) >= MAX_SLOTS_PER_DAY
@@ -318,6 +352,7 @@ export class UrlImportService {
             startTime,
             intervalMinutes,
             slotIndex,
+            startDate,
           );
         }
 
