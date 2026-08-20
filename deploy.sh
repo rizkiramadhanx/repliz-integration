@@ -85,6 +85,26 @@ env_get() {
   fi
 }
 
+echo "==> 0. Memastikan Docker bisa diakses"
+if ! docker info >/dev/null 2>&1; then
+  # Penyebab tersering di Ubuntu: user belum masuk grup `docker`, sehingga
+  # semua perintah docker gagal "permission denied ... /var/run/docker.sock".
+  # Menjalankan seluruh script dengan sudo bukan solusi yang baik (git pull
+  # dan file .env jadi milik root), jadi diarahkan ke perbaikan permanen.
+  if sudo -n docker info >/dev/null 2>&1 || sudo docker info >/dev/null 2>&1; then
+    fail "Docker hanya bisa diakses lewat sudo. Tambahkan user ini ke grup docker
+      (sekali saja, lalu logout-login atau jalankan 'newgrp docker'):
+
+        sudo usermod -aG docker \$USER
+        newgrp docker
+
+      Setelah itu jalankan ./deploy.sh lagi tanpa sudo."
+  fi
+  fail "Docker tidak bisa diakses atau daemon tidak berjalan.
+      Cek dengan: sudo systemctl status docker"
+fi
+echo "    Docker OK."
+
 echo "==> 1. Memastikan .env ada"
 [ -f .env ] || fail "File .env tidak ditemukan. Copy dari .env.example dan isi nilai asli:
       cp .env.example .env && nano .env"
@@ -139,10 +159,24 @@ fi
 # Traefik sengaja dikelola terpisah.
 if docker ps --filter "name=traefik" --format '{{.Names}}' | grep -q .; then
   echo "    Traefik terdeteksi berjalan."
+  # Traefik yang jalan tapi tidak terhubung ke network app tidak akan pernah
+  # membaca label container ini — gejalanya 404 di semua domain, bukan
+  # koneksi gagal, sehingga sulit dibedakan dari salah konfigurasi label.
+  if ! docker network inspect "$APP_NETWORK" \
+      --format '{{range .Containers}}{{.Name}} {{end}}' 2>/dev/null \
+      | grep -qi traefik; then
+    echo "    PERINGATAN: Traefik TIDAK tergabung di network ${APP_NETWORK}."
+    echo "    Semua domain akan balas 404. Sambungkan dengan:"
+    echo "      docker network connect ${APP_NETWORK} <nama-container-traefik>"
+  fi
 else
-  echo "    PERINGATAN: tidak ada container Traefik yang berjalan."
-  echo "    Domain tidak akan bisa diakses sampai Traefik dijalankan:"
+  echo ""
+  echo "    !!! PERINGATAN PENTING: tidak ada container Traefik yang berjalan."
+  echo "    Tanpa Traefik, TIDAK ADA yang mendengarkan port 80/443 — semua"
+  echo "    domain tidak bisa diakses walau container app terlihat Up."
+  echo "    Jalankan (sekali saja, terpisah dari deploy ini):"
   echo "      cd traefik-manual && ACME_EMAIL=kamu@domain.com docker compose -f docker-compose.traefik.yml up -d"
+  echo ""
 fi
 
 echo "==> 4. Pull perubahan terbaru dari git"
