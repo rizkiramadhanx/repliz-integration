@@ -22,6 +22,18 @@
 #   docker inspect <traefik-container> --format '{{json .Config.Cmd}}'
 # JANGAN pernah `docker compose down` network ini dari project lain manapun.
 
+# Script ini memakai fitur bash (array, pipefail). Dijalankan dengan
+# `sh deploy.sh` di Ubuntu, `sh` adalah dash dan akan gagal dengan pesan
+# samar "Illegal option -o pipefail" — jadi di-relaunch otomatis pakai bash
+# supaya cara pemanggilan apa pun tetap bekerja.
+if [ -z "${BASH_VERSION:-}" ]; then
+  if command -v bash >/dev/null 2>&1; then
+    exec bash "$0" "$@"
+  fi
+  echo "ERROR: script ini butuh bash. Install dengan: sudo apt install -y bash" >&2
+  exit 1
+fi
+
 set -euo pipefail
 cd "$(dirname "$0")"
 
