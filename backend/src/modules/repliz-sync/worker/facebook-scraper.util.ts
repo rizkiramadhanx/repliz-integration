@@ -35,7 +35,12 @@ function requireCookies(browsingAccount: AccountEntity): RawSessionCookie[] {
   return cookies;
 }
 
-const SESSION_HARD_TIMEOUT_MS = 3 * 60 * 1000;
+// Anggaran waktu satu sesi. Facebook jauh lebih lambat dari Instagram:
+// membuka tiap detail konten butuh ~5 detik, jadi 50 konten saja sudah
+// melewati 4 menit sebelum menghitung waktu scroll. Batas dinaikkan ke 12
+// menit — tetap ada plafon supaya Chromium tidak menggantung selamanya,
+// tapi cukup untuk maxItems yang wajar.
+const SESSION_HARD_TIMEOUT_MS = 12 * 60 * 1000;
 
 // Sama seperti sesi Instagram: `run()` di-race dengan deadline eksplisit.
 // Tanpa itu, loop scroll yang tidak pernah selesai membuat blok `finally`
@@ -206,11 +211,16 @@ async function listRecentPostLinks(
     waitUntil: 'domcontentloaded',
     timeout: 45000,
   });
-  await page.waitForTimeout(4000);
+  await page.waitForTimeout(3000);
   await assertLoggedIn(page);
 
-  const MAX_SCROLL_ATTEMPTS = 40;
-  const MAX_CONSECUTIVE_NO_PROGRESS = 5;
+  // Jeda scroll dipangkas dari 3s ke 1.5s dan percobaan dibatasi mengikuti
+  // jumlah yang diminta: sebelumnya 40 scroll x 3s bisa menghabiskan 2 menit
+  // hanya untuk menggulir, padahal konten yang dibutuhkan sering sudah
+  // terkumpul jauh lebih awal.
+  const MAX_SCROLL_ATTEMPTS = Math.min(40, Math.max(8, limit));
+  const MAX_CONSECUTIVE_NO_PROGRESS = 3;
+  const SCROLL_WAIT_MS = 1500;
 
   let attempts = 0;
   let consecutiveNoProgress = 0;
@@ -224,7 +234,7 @@ async function listRecentPostLinks(
   while (fresh.length < limit && attempts < MAX_SCROLL_ATTEMPTS) {
     const previousCount = all.length;
     await page.mouse.wheel(0, 5000);
-    await page.waitForTimeout(3000);
+    await page.waitForTimeout(SCROLL_WAIT_MS);
     attempts += 1;
 
     all = await readPostLinksFromDom(page);
@@ -245,12 +255,33 @@ async function scrapePostDetail(
   page: Page,
   link: { postId: string; href: string; isVideo: boolean },
 ): Promise<ScrapedFacebookPost | null> {
-  await page.goto(link.href, {
-    waitUntil: 'domcontentloaded',
-    timeout: 45000,
-  });
-  await page.waitForTimeout(3500);
-  await assertLoggedIn(page);
+  // Video reel diputar lewat MediaSource (blob), sehingga <video>.src selalu
+  // null dan og:video tidak tersedia — URL aslinya HANYA muncul di lalu
+  // lintas jaringan. Karena itu request video disadap, bukan dibaca dari DOM.
+  // Listener dipasang sebelum navigasi agar tidak melewatkan request awal.
+  const sniffedVideoUrls: string[] = [];
+  const captureVideoUrl = (url: string) => {
+    if (!/fbcdn|fbsbx/i.test(url)) return;
+    if (!/\/o1\/v\/t2\/|\.mp4/i.test(url)) return;
+    // Parameter byte-range menandakan potongan; dibuang supaya URL menunjuk
+    // ke berkas utuh yang bisa diunduh sekali jalan.
+    const clean = url.split('&bytestart')[0].split('&byteend')[0];
+    if (!sniffedVideoUrls.includes(clean)) sniffedVideoUrls.push(clean);
+  };
+  const onRequest = (r: { url: () => string }) => captureVideoUrl(r.url());
+  page.on('request', onRequest);
+
+  try {
+    await page.goto(link.href, {
+      waitUntil: 'domcontentloaded',
+      timeout: 45000,
+    });
+    await page.waitForTimeout(link.isVideo ? 6000 : 2000);
+    await assertLoggedIn(page);
+  } finally {
+    // Listener dilepas agar tidak menumpuk lintas pemanggilan pada satu page.
+    page.off('request', onRequest);
+  }
 
   const detail = await page.evaluate(
     ({ mediaHostSource }) => {
@@ -289,12 +320,17 @@ async function scrapePostDetail(
       }
 
       // Caption diambil dari elemen pesan postingan bila ada; og:description
-      // dipakai sebagai cadangan karena sering terpotong.
+      // dipakai sebagai cadangan karena sering terpotong. Halaman reel tidak
+      // memakai penanda data-ad-* seperti postingan biasa, jadi judul
+      // dokumen dipakai sebagai cadangan terakhir.
       const messageEl = document.querySelector(
-        '[data-ad-comet-preview="message"], [data-ad-preview="message"]',
+        '[data-ad-comet-preview="message"], [data-ad-preview="message"], [data-ad-rendering-role="story_message"]',
       );
+      const ogTitle = metaContent('og:title');
       const caption =
-        (messageEl?.textContent ?? '').trim() || (ogDescription ?? '').trim();
+        (messageEl?.textContent ?? '').trim() ||
+        (ogDescription ?? '').trim() ||
+        (ogTitle ?? '').trim();
 
       return {
         ogVideo,
@@ -308,8 +344,16 @@ async function scrapePostDetail(
     { mediaHostSource: FB_MEDIA_HOST.source },
   );
 
-  const videoUrl = detail.ogVideo ?? detail.videoSrc;
-  const isVideo = Boolean(videoUrl) || link.isVideo;
+  const videoUrl =
+    detail.ogVideo ?? detail.videoSrc ?? sniffedVideoUrls[0] ?? null;
+
+  // Reel yang videonya tidak berhasil diambil sengaja dilewati, bukan
+  // dikirim sebagai gambar: URL yang tersedia hanya thumbnail (t15.*), dan
+  // menjadwalkannya ke Repliz akan menghasilkan postingan gambar diam yang
+  // bukan konten aslinya.
+  if (link.isVideo && !videoUrl) return null;
+
+  const isVideo = Boolean(videoUrl);
 
   // Gambar sangat kecil hampir pasti ikon UI, bukan media postingan.
   const MIN_IMAGE_AREA = 40_000;
