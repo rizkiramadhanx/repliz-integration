@@ -145,6 +145,19 @@ if [ -n "$PUBLIC_BASE_URL" ]; then
   esac
 fi
 
+# Domain contoh dari .env.example lolos semua pemeriksaan lain (skema benar,
+# bukan localhost) sehingga kegagalannya baru terlihat jauh kemudian sebagai
+# penolakan Instagram/Repliz: "media could not be fetched from this URI".
+for key in BACKEND_DOMAIN FRONTEND_DOMAIN; do
+  value="$(env_get "$key")"
+  case "$value" in
+    *example.com|*example.org|*example.net)
+      fail "$key masih berisi domain contoh ($value).
+      Ganti dengan domain aslimu di .env — media tidak akan bisa diunduh
+      Instagram/Repliz selama domainnya belum benar." ;;
+  esac
+done
+
 echo "==> 3. Memastikan network ${APP_NETWORK} dan Traefik siap"
 if ! docker network inspect "$APP_NETWORK" >/dev/null 2>&1; then
   echo "    Network ${APP_NETWORK} belum ada, membuat..."

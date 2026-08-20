@@ -90,6 +90,16 @@ export function assertPublicBaseUrlUsable(): void {
     );
   }
 
+  // Domain contoh dari .env.example gampang tertinggal saat menyalin berkas
+  // itu. Nilainya lolos semua pemeriksaan lain (skema benar, bukan localhost),
+  // sehingga kegagalannya baru muncul jauh di belakang sebagai penolakan dari
+  // Instagram/Repliz: "media could not be fetched from this URI".
+  if (/(^|\.)example\.(com|org|net)$/i.test(new URL(baseUrl).hostname)) {
+    throw new Error(
+      `PUBLIC_BASE_URL (${baseUrl}) masih memakai domain contoh dari .env.example. Ganti BACKEND_DOMAIN di .env dengan domain aslimu.`,
+    );
+  }
+
   let parsed: URL;
   try {
     parsed = new URL(baseUrl);
