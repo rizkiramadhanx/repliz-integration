@@ -13,15 +13,27 @@ import path from 'path';
       useFactory: async (configService: ConfigService) => ({
         transport: {
           host: configService.get<string>('MAIL_HOST'),
-          port: configService.get<number>('MAIL_PORT'),
-          secure: true,
+          port: Number(configService.get<string>('MAIL_PORT')) || 465,
+          // SMTP implisit-TLS (465) butuh secure: true, sedangkan STARTTLS
+          // (587/25) butuh false. Sebelumnya nilainya dipaku true sehingga
+          // koneksi ke port 587 akan menggantung. Default mengikuti port
+          // supaya konfigurasi umum tetap benar tanpa MAIL_SECURE.
+          secure:
+            configService.get<string>('MAIL_SECURE') !== undefined
+              ? configService.get<string>('MAIL_SECURE') === 'true'
+              : Number(configService.get<string>('MAIL_PORT')) === 465,
           auth: {
             user: configService.get<string>('MAIL_USER'),
             pass: configService.get<string>('MAIL_PASS'),
           },
         },
         defaults: {
-          from: `"No Reply" <${configService.get<string>('MAIL_FROM')}>`,
+          // Nama pengirim sebelumnya dipaku "No Reply"; kini bisa diatur
+          // lewat MAIL_FROM_NAME. Tanda kutip di dalam nama di-escape agar
+          // header From tidak rusak.
+          from: `"${(
+            configService.get<string>('MAIL_FROM_NAME') ?? 'No Reply'
+          ).replace(/"/g, '\\"')}" <${configService.get<string>('MAIL_FROM')}>`,
         },
         template: {
           dir: path.join(
