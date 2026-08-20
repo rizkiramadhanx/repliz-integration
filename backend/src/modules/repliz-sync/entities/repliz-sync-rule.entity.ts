@@ -11,8 +11,8 @@ export type ReplizSyncSourcePlatform = 'instagram' | 'facebook';
 
 // Model: x -> z -> y
 //   x = akun pemantau (cookies IG) yang membuka Instagram untuk membaca.
-//       Hanya SATU untuk seluruh sistem, ditentukan lewat setelan global
-//       (SCRAPE_BROWSING_ACCOUNT_ID) — jadi tidak disimpan per rule.
+//       Dipilih otomatis dari akun terdaftar yang tipenya cocok dengan
+//       sourcePlatform — jadi tidak disimpan per rule.
 //   z = akun target yang dikloning kontennya. BISA BANYAK dalam satu rule
 //       (targetUsernames), semuanya memakai setelan jadwal yang sama.
 //   y = akun Repliz tujuan posting (replizAccountId).

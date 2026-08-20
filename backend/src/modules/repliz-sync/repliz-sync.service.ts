@@ -1,5 +1,4 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { AccountEntity } from '../accounts/entities/account.entity';
@@ -48,55 +47,35 @@ export class ReplizSyncService {
     @InjectRepository(AccountEntity)
     private readonly accountRepo: Repository<AccountEntity>,
     private readonly replizService: ReplizService,
-    private readonly configService: ConfigService,
   ) {}
 
-  // Akun pemantau (x) untuk platform tertentu. Scraping Facebook butuh
-  // cookies akun Facebook dan Instagram butuh cookies Instagram, jadi akun
-  // dipilih per platform — bukan satu akun untuk semua.
+  // Akun pemantau (x) dipilih OTOMATIS dari daftar akun yang terdaftar:
+  // akun pertama yang tipenya cocok dengan platform sumber rule. Scraping
+  // Facebook butuh cookies akun Facebook dan Instagram butuh cookies
+  // Instagram, jadi pemilihannya per platform — bukan satu akun untuk semua.
   //
-  // Env yang dipakai: SCRAPE_BROWSING_ACCOUNT_ID untuk Instagram (nama lama,
-  // dipertahankan supaya konfigurasi yang sudah ada tidak rusak) dan
-  // SCRAPE_BROWSING_ACCOUNT_ID_FACEBOOK untuk Facebook. Bila tidak diisi,
-  // dipakai akun pertama dengan tipe yang cocok.
+  // Akun yang berstatus 'connected' didahulukan supaya akun dengan cookies
+  // yang sudah diketahui kedaluwarsa tidak dipakai selama masih ada yang
+  // sehat; kalau tidak ada yang connected, akun terlama tetap dicoba agar
+  // sinkronisasi tidak berhenti hanya karena status belum pernah dicek.
   private async resolveBrowsingAccount(
     platform: ReplizSyncSourcePlatform,
   ): Promise<AccountEntity> {
-    const envKey =
-      platform === 'facebook'
-        ? 'SCRAPE_BROWSING_ACCOUNT_ID_FACEBOOK'
-        : 'SCRAPE_BROWSING_ACCOUNT_ID';
-    const configuredId = this.configService.get<string>(envKey);
-
-    if (configuredId) {
-      const account = await this.accountRepo.findOne({
-        where: { id: configuredId },
-      });
-      if (!account) {
-        throw new NotFoundException(
-          `Akun pemantau (${envKey}=${configuredId}) tidak ditemukan`,
-        );
-      }
-      // Akun dengan tipe salah akan gagal dengan pesan membingungkan saat
-      // cookies-nya dipakai, jadi ditolak lebih awal dengan sebab yang jelas.
-      if (account.type !== platform) {
-        throw new NotFoundException(
-          `Akun pemantau (${envKey}) bertipe ${account.type}, sedangkan rule ini butuh akun ${platform}`,
-        );
-      }
-      return account;
-    }
-
-    const fallback = await this.accountRepo.findOne({
+    const candidates = await this.accountRepo.find({
       where: { type: platform },
       order: { createdAt: 'ASC' },
     });
-    if (!fallback) {
+
+    if (candidates.length === 0) {
       throw new NotFoundException(
-        `Belum ada akun ${platform} untuk dipakai sebagai akun pemantau. Tambahkan di menu Account atau set ${envKey}.`,
+        `Belum ada akun ${platform} untuk dipakai sebagai akun pemantau. Tambahkan di menu Account.`,
       );
     }
-    return fallback;
+
+    return (
+      candidates.find((account) => account.connectionStatus === 'connected') ??
+      candidates[0]
+    );
   }
 
   // scheduleAt disusun mulai dari jam yang ditentukan rule pada hari ini.

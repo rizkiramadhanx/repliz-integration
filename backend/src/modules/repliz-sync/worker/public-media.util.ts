@@ -30,11 +30,29 @@ export type DownloadedMedia = {
 // URL publik wajib absolut dan bisa dijangkau dari internet: yang mengunduh
 // file ini adalah server Repliz, bukan browser user. localhost otomatis
 // gagal — karena itu PUBLIC_BASE_URL divalidasi eksplisit saat dipakai.
+// Basis URL publik. PUBLIC_BASE_URL hanya perlu diisi kalau domainnya beda
+// dari BACKEND_DOMAIN (mis. memakai tunnel saat pengembangan); selain itu
+// nilainya diturunkan otomatis supaya tidak ada satu setelan yang harus
+// dijaga konsisten di dua tempat.
+export function resolvePublicBaseUrl(): string | null {
+  const explicit = process.env.PUBLIC_BASE_URL?.trim();
+  if (explicit) return explicit;
+
+  const backendDomain = process.env.BACKEND_DOMAIN?.trim();
+  if (backendDomain) {
+    return /^https?:\/\//i.test(backendDomain)
+      ? backendDomain
+      : `https://${backendDomain}`;
+  }
+
+  return null;
+}
+
 export function buildPublicUrl(publicPath: string): string {
-  const baseUrl = process.env.PUBLIC_BASE_URL;
+  const baseUrl = resolvePublicBaseUrl();
   if (!baseUrl) {
     throw new Error(
-      'PUBLIC_BASE_URL belum dikonfigurasi — server Repliz butuh URL media yang bisa diakses dari internet',
+      'PUBLIC_BASE_URL/BACKEND_DOMAIN belum dikonfigurasi — server Repliz butuh URL media yang bisa diakses dari internet',
     );
   }
   return `${normalizePublicBaseUrl(baseUrl)}/${publicPath.replace(/^\/+/, '')}`;
@@ -60,10 +78,10 @@ export function normalizePublicBaseUrl(baseUrl: string): string {
 }
 
 export function assertPublicBaseUrlUsable(): void {
-  const baseUrl = process.env.PUBLIC_BASE_URL;
+  const baseUrl = resolvePublicBaseUrl();
   if (!baseUrl) {
     throw new Error(
-      'PUBLIC_BASE_URL belum dikonfigurasi — isi dengan domain backend yang bisa diakses publik',
+      'BACKEND_DOMAIN belum dikonfigurasi — isi dengan domain backend yang bisa diakses publik (atau PUBLIC_BASE_URL bila domainnya berbeda)',
     );
   }
   if (/localhost|127\.0\.0\.1|0\.0\.0\.0/i.test(baseUrl)) {

@@ -90,8 +90,11 @@ openssl rand -base64 48   # jalankan 2x, untuk JWT_SECRET & JWT_SECRET_REFRESH
 | `REPLIZ_ACCESS_KEY` | Dari Dashboard Repliz → Settings → API |
 | `REPLIZ_SECRET_KEY` | idem |
 | `REPLIZ_BASE_URL` | Opsional, default `https://api.repliz.com` |
-| `PUBLIC_BASE_URL` | **Opsional** — default otomatis ke `https://${BACKEND_DOMAIN}`. **Jangan tulis port** (lihat catatan di bawah) |
-| `SCRAPE_BROWSING_ACCOUNT_ID` | Opsional — UUID akun pemantau (x). Kosong = pakai akun Instagram pertama |
+| `PUBLIC_BASE_URL` | **Opsional** — otomatis `https://${BACKEND_DOMAIN}`. Isi hanya bila domainnya berbeda (mis. tunnel). **Jangan tulis port** (lihat catatan di bawah) |
+
+Akun pemantau (**x**) tidak lagi dikonfigurasi lewat env: sistem otomatis
+memakai akun terdaftar yang tipenya cocok dengan platform sumber rule, dan
+mendahulukan yang berstatus `connected`.
 
 > **`PUBLIC_BASE_URL` tidak perlu diisi manual saat deploy.** Nilainya
 > otomatis mengikuti `BACKEND_DOMAIN`. Yang penting: URL ini **harus bisa
@@ -190,9 +193,8 @@ server Repliz tidak akan bisa mengunduh media dan sinkronisasi akan gagal.
 1. Login ke `https://app.domain.com`
 2. Menu **Account** → tambahkan akun Instagram pemantau (**x**) beserta
    cookies. Akun ini hanya dipakai membaca, tidak pernah memposting.
-3. *(Opsional)* Salin UUID akun tersebut ke `SCRAPE_BROWSING_ACCOUNT_ID`
-   di `.env`, lalu `./deploy.sh` ulang. Kalau dilewati, sistem memakai
-   akun Instagram pertama yang terdaftar.
+   Untuk rule berplatform Facebook, tambahkan juga akun Facebook beserta
+   cookies. Sistem memilih akun pemantau otomatis sesuai platform rule.
 4. Menu **Repliz** → pastikan akun tujuan (**y**) muncul dan `connected`
 5. Menu **Sinkronisasi Repliz** → **Tambah Rule**:
    - Target (**z**) — username Instagram yang dikloning
