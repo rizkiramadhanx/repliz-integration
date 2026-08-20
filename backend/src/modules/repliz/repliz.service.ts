@@ -52,6 +52,20 @@ export type ReplizScheduleType =
   | 'link'
   | 'story';
 
+// Opsi tambahan Repliz. Hanya `isAutoAddMusic` yang dipakai saat ini;
+// field lain (music, collaborators, products, tags) didefinisikan supaya
+// pemanggil tidak perlu mengulang bentuknya bila nanti diperlukan.
+export type ReplizAdditionalInfo = {
+  isAutoAddMusic?: boolean;
+  isDraft?: boolean;
+  isAiGenerated?: boolean;
+  music?: { id: string; artist?: string; name?: string; thumbnail?: string };
+  collaborators?: string[];
+  mentions?: string[];
+  tags?: string[];
+  targetCountries?: string[];
+};
+
 export type CreateScheduleParams = {
   accountId: string;
   title: string;
@@ -59,6 +73,7 @@ export type CreateScheduleParams = {
   type: ReplizScheduleType;
   medias: ReplizMedia[];
   scheduleAt: string;
+  additionalInfo?: ReplizAdditionalInfo;
 };
 
 export type ReplizSchedule = {
@@ -180,6 +195,12 @@ export class ReplizService {
           medias: params.medias,
           accountId: params.accountId,
           scheduleAt: params.scheduleAt,
+          // Hanya dikirim bila diisi — mengirim objek kosong bisa menimpa
+          // perilaku bawaan Repliz.
+          ...(params.additionalInfo &&
+          Object.keys(params.additionalInfo).length > 0
+            ? { additionalInfo: params.additionalInfo }
+            : {}),
         },
         { headers: { Authorization: this.authHeader() } },
       );

@@ -8,6 +8,7 @@ import {
   Badge,
   Box,
   Button,
+  Checkbox,
   Code,
   Group,
   List,
@@ -54,6 +55,10 @@ export default function PageUrlImport() {
   });
   const [startTime, setStartTime] = useState("06:00");
   const [intervalMinutes, setIntervalMinutes] = useState<number | string>(60);
+  // Dikelola sebagai "belum disentuh pengguna" (null) supaya bisa mengikuti
+  // platform akun tujuan secara otomatis; begitu pengguna mengubahnya,
+  // pilihannya dihormati dan tidak ditimpa lagi.
+  const [autoAddMusic, setAutoAddMusic] = useState<boolean | null>(null);
   const [results, setResults] = useState<typeImportUrlResult[]>([]);
 
   const { data: dataReplizAccount } = useGetAllReplizAccount({
@@ -61,6 +66,15 @@ export default function PageUrlImport() {
     limit: 50,
   });
   const replizAccounts = dataReplizAccount?.data?.data?.docs ?? [];
+  const selectedAccount = replizAccounts.find(
+    (account) => account.id === replizAccountId,
+  );
+
+  // TikTok menekan jangkauan video tanpa trek musik terdaftar, jadi opsi ini
+  // dinyalakan secara bawaan untuk akun TikTok. Platform lain tidak, karena
+  // di sana musik tambahan justru menimpa audio asli konten.
+  const isTiktokTarget = selectedAccount?.type === "tiktok";
+  const effectiveAutoAddMusic = autoAddMusic ?? isTiktokTarget;
 
   const { mutate: importUrls, isPending } = useMutateImportUrls();
 
@@ -94,6 +108,7 @@ export default function PageUrlImport() {
         startDate,
         startTime,
         intervalMinutes: Number(intervalMinutes) || 60,
+        autoAddMusic: effectiveAutoAddMusic,
       },
       {
         onSuccess: (res) => {
@@ -204,6 +219,18 @@ export default function PageUrlImport() {
           onChange={setIntervalMinutes}
         />
       </Group>
+
+      <Checkbox
+        mt={14}
+        label="Tambahkan musik otomatis (khusus video)"
+        description={
+          isTiktokTarget
+            ? "Aktif otomatis karena akun tujuan TikTok — video tanpa trek musik terdaftar cenderung ditekan jangkauannya."
+            : "Repliz akan memilihkan musik. Umumnya hanya diperlukan untuk akun TikTok."
+        }
+        checked={effectiveAutoAddMusic}
+        onChange={(e) => setAutoAddMusic(e.currentTarget.checked)}
+      />
 
       <Group mt={16}>
         <Button

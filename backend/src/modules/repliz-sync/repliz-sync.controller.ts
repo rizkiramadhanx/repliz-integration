@@ -216,6 +216,7 @@ export class ReplizSyncController {
       startDate?: string;
       startTime?: string;
       intervalMinutes?: number;
+      autoAddMusic?: boolean;
     },
     @Res({ passthrough: true }) res: Response,
   ) {
@@ -252,6 +253,7 @@ export class ReplizSyncController {
         replizAccountId: body.replizAccountId,
         startDate: body.startDate,
         startTime: body.startTime,
+        autoAddMusic: body.autoAddMusic === true,
         intervalMinutes: body.intervalMinutes,
       });
 

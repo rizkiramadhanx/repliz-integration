@@ -15,6 +15,7 @@ export type typeImportUrlsPayload = {
   replizAccountId: string;
   startDate?: string;
   startTime?: string;
+  autoAddMusic?: boolean;
   intervalMinutes?: number;
 };
 

@@ -24,6 +24,9 @@ export type ImportUrlsParams = {
   startDate?: string;
   startTime?: string;
   intervalMinutes?: number;
+  // Minta Repliz menambahkan musik otomatis. Berguna untuk akun TikTok:
+  // sebagian platform menekan jangkauan video tanpa trek musik terdaftar.
+  autoAddMusic?: boolean;
 };
 
 type ResolvedMedia = {
@@ -304,6 +307,7 @@ export class UrlImportService {
       startDate,
       startTime = '06:00',
       intervalMinutes = 60,
+      autoAddMusic = false,
     } = params;
 
     // Dicek lebih dulu supaya tidak mengunduh apa pun bila URL medianya
@@ -369,6 +373,11 @@ export class UrlImportService {
             { url: publicUrl, type: media.isVideo ? 'video' : 'image' },
           ],
           scheduleAt: scheduledAt.toISOString(),
+          // Musik hanya relevan untuk video; menyalakannya pada gambar
+          // tidak berpengaruh dan berpotensi ditolak platform.
+          ...(autoAddMusic && media.isVideo
+            ? { additionalInfo: { isAutoAddMusic: true } }
+            : {}),
         });
 
         results.push({
