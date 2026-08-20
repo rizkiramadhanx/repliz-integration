@@ -7,6 +7,7 @@ import {
 } from 'typeorm';
 
 export type ReplizSyncRuleStatus = 'active' | 'paused';
+export type ReplizSyncSourcePlatform = 'instagram' | 'facebook';
 
 // Model: x -> z -> y
 //   x = akun pemantau (cookies IG) yang membuka Instagram untuk membaca.
@@ -51,6 +52,14 @@ export class ReplizSyncRuleEntity {
   @Column({ name: 'schedule_interval_minutes', type: 'int', default: 60 })
   scheduleIntervalMinutes: number;
 
+  // Platform sumber konten. Akun pemantau (x) yang dipakai menyesuaikan
+  // platform ini — scraping Facebook butuh cookies akun Facebook, bukan
+  // Instagram.
+  @Column({ name: 'source_platform', default: 'instagram' })
+  sourcePlatform: ReplizSyncSourcePlatform;
+
+  // Khusus Instagram. Facebook tidak punya pemisahan posts/reels di level
+  // URL profil, jadi nilai ini diabaikan saat sourcePlatform = 'facebook'.
   @Column({ name: 'scrape_mode', default: 'posts' })
   scrapeMode: 'posts' | 'reels';
 

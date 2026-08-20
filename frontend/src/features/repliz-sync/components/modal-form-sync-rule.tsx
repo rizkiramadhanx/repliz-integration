@@ -40,6 +40,9 @@ export default function ModalFormSyncRule({
   const [scheduleIntervalMinutes, setScheduleIntervalMinutes] = useState<
     number | string
   >(60);
+  const [sourcePlatform, setSourcePlatform] = useState<
+    "instagram" | "facebook"
+  >("instagram");
   const [scrapeMode, setScrapeMode] = useState<"posts" | "reels">("posts");
   const [status, setStatus] = useState<"active" | "paused">("active");
 
@@ -62,6 +65,7 @@ export default function ModalFormSyncRule({
     setMaxItems(rule?.maxItems ?? 25);
     setScheduleStartTime(rule?.scheduleStartTime ?? "06:00");
     setScheduleIntervalMinutes(rule?.scheduleIntervalMinutes ?? 60);
+    setSourcePlatform(rule?.sourcePlatform ?? "instagram");
     setScrapeMode(rule?.scrapeMode ?? "posts");
     setStatus(rule?.status ?? "active");
   }, [open, rule]);
@@ -87,6 +91,7 @@ export default function ModalFormSyncRule({
       maxItems: Number(maxItems) || 25,
       scheduleStartTime,
       scheduleIntervalMinutes: Number(scheduleIntervalMinutes) || 60,
+      sourcePlatform,
       scrapeMode,
       status,
     };
@@ -133,10 +138,26 @@ export default function ModalFormSyncRule({
           onChange={(e) => setLabel(e.currentTarget.value)}
           required
         />
+        <Select
+          label="Platform sumber"
+          description="Akun pemantau yang dipakai menyesuaikan platform ini"
+          data={[
+            { value: "instagram", label: "Instagram" },
+            { value: "facebook", label: "Facebook" },
+          ]}
+          value={sourcePlatform}
+          onChange={(v) =>
+            setSourcePlatform((v as "instagram" | "facebook") ?? "instagram")
+          }
+        />
         <TagsInput
           label="Akun target (z) yang dikloning"
           placeholder="Ketik username lalu Enter atau koma"
-          description="Username Instagram tanpa @. Bisa lebih dari satu — pisahkan dengan Enter atau koma."
+          description={
+            sourcePlatform === "facebook"
+              ? "Username/ID Page atau profil Facebook. Bisa lebih dari satu — pisahkan dengan Enter atau koma."
+              : "Username Instagram tanpa @. Bisa lebih dari satu — pisahkan dengan Enter atau koma."
+          }
           data={[]}
           value={targetUsernames}
           onChange={(values) =>
@@ -174,7 +195,11 @@ export default function ModalFormSyncRule({
             onChange={setMaxItems}
           />
           <Select
-            label="Sumber"
+            label="Jenis konten"
+            description={
+              sourcePlatform === "facebook" ? "Khusus Instagram" : undefined
+            }
+            disabled={sourcePlatform === "facebook"}
             data={[
               { value: "posts", label: "Posts" },
               { value: "reels", label: "Reels" },

@@ -68,6 +68,10 @@ export class CreateReplizSyncRuleDto {
   scheduleIntervalMinutes?: number;
 
   @IsOptional()
+  @IsIn(['instagram', 'facebook'])
+  sourcePlatform?: 'instagram' | 'facebook';
+
+  @IsOptional()
   @IsIn(['posts', 'reels'])
   scrapeMode?: 'posts' | 'reels';
 

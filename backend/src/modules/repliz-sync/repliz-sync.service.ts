@@ -4,9 +4,13 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { AccountEntity } from '../accounts/entities/account.entity';
 import { ReplizService } from '../repliz/repliz.service';
-import { ReplizSyncRuleEntity } from './entities/repliz-sync-rule.entity';
+import {
+  ReplizSyncRuleEntity,
+  ReplizSyncSourcePlatform,
+} from './entities/repliz-sync-rule.entity';
 import { ReplizSyncedPostEntity } from './entities/repliz-synced-post.entity';
 import { scrapeLatestInstagramPosts } from './worker/instagram-scraper.util';
+import { scrapeLatestFacebookPosts } from './worker/facebook-scraper.util';
 import {
   assertPublicBaseUrlUsable,
   buildPublicUrl,
@@ -47,14 +51,22 @@ export class ReplizSyncService {
     private readonly configService: ConfigService,
   ) {}
 
-  // Akun pemantau (x) tunggal untuk seluruh sistem. Dipilih lewat env
-  // SCRAPE_BROWSING_ACCOUNT_ID; kalau tidak diisi, dipakai akun Instagram
-  // pertama yang terhubung — supaya sistem tetap jalan tanpa konfigurasi
-  // tambahan pada instalasi dengan satu akun IG saja.
-  private async resolveBrowsingAccount(): Promise<AccountEntity> {
-    const configuredId = this.configService.get<string>(
-      'SCRAPE_BROWSING_ACCOUNT_ID',
-    );
+  // Akun pemantau (x) untuk platform tertentu. Scraping Facebook butuh
+  // cookies akun Facebook dan Instagram butuh cookies Instagram, jadi akun
+  // dipilih per platform — bukan satu akun untuk semua.
+  //
+  // Env yang dipakai: SCRAPE_BROWSING_ACCOUNT_ID untuk Instagram (nama lama,
+  // dipertahankan supaya konfigurasi yang sudah ada tidak rusak) dan
+  // SCRAPE_BROWSING_ACCOUNT_ID_FACEBOOK untuk Facebook. Bila tidak diisi,
+  // dipakai akun pertama dengan tipe yang cocok.
+  private async resolveBrowsingAccount(
+    platform: ReplizSyncSourcePlatform,
+  ): Promise<AccountEntity> {
+    const envKey =
+      platform === 'facebook'
+        ? 'SCRAPE_BROWSING_ACCOUNT_ID_FACEBOOK'
+        : 'SCRAPE_BROWSING_ACCOUNT_ID';
+    const configuredId = this.configService.get<string>(envKey);
 
     if (configuredId) {
       const account = await this.accountRepo.findOne({
@@ -62,19 +74,26 @@ export class ReplizSyncService {
       });
       if (!account) {
         throw new NotFoundException(
-          `Akun pemantau (SCRAPE_BROWSING_ACCOUNT_ID=${configuredId}) tidak ditemukan`,
+          `Akun pemantau (${envKey}=${configuredId}) tidak ditemukan`,
+        );
+      }
+      // Akun dengan tipe salah akan gagal dengan pesan membingungkan saat
+      // cookies-nya dipakai, jadi ditolak lebih awal dengan sebab yang jelas.
+      if (account.type !== platform) {
+        throw new NotFoundException(
+          `Akun pemantau (${envKey}) bertipe ${account.type}, sedangkan rule ini butuh akun ${platform}`,
         );
       }
       return account;
     }
 
     const fallback = await this.accountRepo.findOne({
-      where: { type: 'instagram' },
+      where: { type: platform },
       order: { createdAt: 'ASC' },
     });
     if (!fallback) {
       throw new NotFoundException(
-        'Belum ada akun Instagram untuk dipakai sebagai akun pemantau. Tambahkan di menu Account atau set SCRAPE_BROWSING_ACCOUNT_ID.',
+        `Belum ada akun ${platform} untuk dipakai sebagai akun pemantau. Tambahkan di menu Account atau set ${envKey}.`,
       );
     }
     return fallback;
@@ -84,21 +103,54 @@ export class ReplizSyncService {
   // Kalau jam itu sudah lewat (mis. cron telat / run manual siang hari),
   // titik mulai digeser ke sekarang + 1 interval supaya Repliz tidak
   // menerima jadwal di masa lalu yang akan langsung terbit sekaligus.
+  // Jumlah konten maksimum yang boleh dijadwalkan dalam satu hari. Tanpa
+  // batas ini, 25 konten dengan interval 60 menit akan melewati tengah malam
+  // dan tumpah ke tanggal berikutnya di tengah rangkaian — jadwalnya jadi
+  // sulit ditinjau dan tidak sesuai harapan "sehari sekian konten".
+  private static readonly MAX_SLOTS_PER_DAY = 24;
+
+  // Membagi slot ke dalam hari: MAX_SLOTS_PER_DAY konten pertama masuk hari
+  // pertama, sisanya pindah ke hari berikutnya dan mulai lagi dari jam yang
+  // sama. Slot dalam satu hari juga dipotong agar tidak melewati tengah
+  // malam, sehingga isi satu hari tidak pernah bocor ke tanggal lain.
   private scheduleTimeAt(rule: ReplizSyncRuleEntity, slotIndex: number): Date {
     const [hour, minute] = rule.scheduleStartTime
       .split(':')
       .map((value) => Number(value));
 
+    const intervalMs = rule.scheduleIntervalMinutes * 60 * 1000;
+
+    // Berapa slot yang muat sebelum tengah malam, dihitung dari jam mulai.
+    // Slot ke-n jatuh pada start + n*interval; yang muat adalah n dengan
+    // n*interval < sisa menit hari itu, sehingga jumlahnya ceil(sisa/interval).
+    const startMinuteOfDay = (hour || 0) * 60 + (minute || 0);
+    const minutesLeftInDay = 24 * 60 - startMinuteOfDay;
+    const slotsBeforeMidnight = Math.max(
+      1,
+      Math.ceil(minutesLeftInDay / rule.scheduleIntervalMinutes),
+    );
+
+    const slotsPerDay = Math.min(
+      ReplizSyncService.MAX_SLOTS_PER_DAY,
+      slotsBeforeMidnight,
+    );
+
+    const dayOffset = Math.floor(slotIndex / slotsPerDay);
+    const slotInDay = slotIndex % slotsPerDay;
+
     const start = new Date();
     start.setHours(hour || 0, minute || 0, 0, 0);
 
-    const intervalMs = rule.scheduleIntervalMinutes * 60 * 1000;
-    const now = Date.now();
-    if (start.getTime() <= now) {
-      start.setTime(now + intervalMs);
-    }
+    // Kalau jam mulai hari ini sudah lewat (cron telat / run manual siang
+    // hari), seluruh rangkaian digeser ke hari berikutnya pada jam yang sama
+    // — bukan ke "sekarang + interval", supaya jam terbit tetap konsisten
+    // dengan yang dikonfigurasi.
+    const baseDayOffset = start.getTime() <= Date.now() ? 1 : 0;
 
-    return new Date(start.getTime() + slotIndex * intervalMs);
+    // setDate() dipakai (bukan penjumlahan milidetik) supaya pergeseran hari
+    // tetap benar saat melewati batas DST.
+    start.setDate(start.getDate() + baseDayOffset + dayOffset);
+    return new Date(start.getTime() + slotInDay * intervalMs);
   }
 
   async runRule(ruleId: string): Promise<RunRuleResult> {
@@ -109,7 +161,9 @@ export class ReplizSyncService {
     // gagal di langkah terakhir saat URL media ternyata tidak publik.
     assertPublicBaseUrlUsable();
 
-    const browsingAccount = await this.resolveBrowsingAccount();
+    const platform: ReplizSyncSourcePlatform =
+      rule.sourcePlatform ?? 'instagram';
+    const browsingAccount = await this.resolveBrowsingAccount(platform);
     const targets = rule.targetUsernames ?? [];
 
     // Jadwal disusun lintas-target dalam satu rule, bukan diulang dari jam
@@ -128,19 +182,47 @@ export class ReplizSyncService {
           alreadySynced.map((row) => row.shortcode),
         );
 
-        const posts = await scrapeLatestInstagramPosts(
-          browsingAccount,
-          targetUsername,
-          rule.maxItems,
-          excludeShortcodes,
-          rule.scrapeMode,
-        );
+        // Hasil kedua scraper dinormalkan ke bentuk yang sama supaya sisa
+        // alur (jadwal, unduh media, catat) tidak perlu tahu platformnya.
+        // `shortcode` menampung id postingan Facebook agar kunci anti-duplikat
+        // yang sudah ada tetap dipakai tanpa kolom tambahan.
+        const posts =
+          platform === 'facebook'
+            ? (
+                await scrapeLatestFacebookPosts(
+                  browsingAccount,
+                  targetUsername,
+                  rule.maxItems,
+                  excludeShortcodes,
+                )
+              ).map((post) => ({
+                shortcode: post.postId,
+                caption: post.caption,
+                mediaUrl: post.mediaUrl,
+                isVideo: post.isVideo,
+                postUrl: post.postUrl,
+              }))
+            : (
+                await scrapeLatestInstagramPosts(
+                  browsingAccount,
+                  targetUsername,
+                  rule.maxItems,
+                  excludeShortcodes,
+                  rule.scrapeMode,
+                )
+              ).map((post) => ({
+                shortcode: post.shortcode,
+                caption: post.caption,
+                mediaUrl: post.mediaUrl,
+                isVideo: post.isVideo,
+                postUrl: `https://www.instagram.com/p/${post.shortcode}/`,
+              }));
 
         // Scraper mengembalikan konten dari yang TERBARU lebih dulu (urutan
-        // tampilan profil Instagram). Kalau dijadwalkan apa adanya, konten
-        // terbaru justru terbit paling awal dan yang lama terbit belakangan —
-        // urutan terbalik dari aslinya. Dibalik supaya terbit runut sesuai
-        // urutan asli: yang paling lama duluan, terbaru terakhir.
+        // tampilan profil). Kalau dijadwalkan apa adanya, konten terbaru
+        // justru terbit paling awal dan yang lama terbit belakangan — urutan
+        // terbalik dari aslinya. Dibalik supaya terbit runut sesuai urutan
+        // asli: yang paling lama duluan, terbaru terakhir.
         const fresh = posts
           .filter((post) => !excludeShortcodes.has(post.shortcode))
           .reverse();
@@ -175,7 +257,7 @@ export class ReplizSyncService {
                 ruleId: rule.id,
                 targetUsername,
                 shortcode: post.shortcode,
-                postUrl: `https://www.instagram.com/p/${post.shortcode}/`,
+                postUrl: post.postUrl,
                 caption: post.caption ?? null,
                 mediaUrl: publicUrl,
                 isVideo: post.isVideo,
@@ -202,7 +284,7 @@ export class ReplizSyncService {
                 ruleId: rule.id,
                 targetUsername,
                 shortcode: post.shortcode,
-                postUrl: `https://www.instagram.com/p/${post.shortcode}/`,
+                postUrl: post.postUrl,
                 caption: post.caption ?? null,
                 isVideo: post.isVideo,
                 status: 'failed',

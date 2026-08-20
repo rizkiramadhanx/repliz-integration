@@ -240,11 +240,27 @@ export default function PageReplizSync() {
               >
                 <Table.Td>{rule.label}</Table.Td>
                 <Table.Td>
+                  <Badge
+                    size="xs"
+                    variant="light"
+                    color={
+                      rule.sourcePlatform === "facebook" ? "blue" : "pink"
+                    }
+                    mb={4}
+                  >
+                    {rule.sourcePlatform === "facebook"
+                      ? "facebook"
+                      : "instagram"}
+                  </Badge>
                   <Group gap={6} wrap="wrap">
                     {(rule.targetUsernames ?? []).map((username) => (
                       <Anchor
                         key={username}
-                        href={`https://www.instagram.com/${username}`}
+                        href={
+                          rule.sourcePlatform === "facebook"
+                            ? `https://www.facebook.com/${username}`
+                            : `https://www.instagram.com/${username}`
+                        }
                         target="_blank"
                         rel="noopener noreferrer"
                         size="sm"
@@ -269,7 +285,10 @@ export default function PageReplizSync() {
                     {rule.scheduleIntervalMinutes}m
                   </Text>
                   <Text size="xs" c="dimmed">
-                    maks {rule.maxItems} · {rule.scrapeMode}
+                    maks {rule.maxItems}
+                    {rule.sourcePlatform !== "facebook"
+                      ? ` · ${rule.scrapeMode}`
+                      : ""}
                   </Text>
                 </Table.Td>
                 <Table.Td>
