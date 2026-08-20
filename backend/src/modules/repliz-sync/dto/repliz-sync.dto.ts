@@ -58,6 +58,12 @@ export class CreateReplizSyncRuleDto {
 
   @IsOptional()
   @Matches(/^([01]\d|2[0-3]):([0-5]\d)$/, {
+    message: 'scrapeTime harus format HH:mm',
+  })
+  scrapeTime?: string;
+
+  @IsOptional()
+  @Matches(/^([01]\d|2[0-3]):([0-5]\d)$/, {
     message: 'scheduleStartTime harus format HH:mm',
   })
   scheduleStartTime?: string;

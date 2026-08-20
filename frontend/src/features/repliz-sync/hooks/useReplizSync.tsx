@@ -74,6 +74,7 @@ export type typeCreateSyncRulePayload = {
   replizAccountId: string;
   replizAccountLabel?: string;
   maxItems?: number;
+  scrapeTime?: string;
   scheduleStartTime?: string;
   scheduleIntervalMinutes?: number;
   sourcePlatform?: "instagram" | "facebook";

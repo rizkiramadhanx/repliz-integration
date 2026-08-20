@@ -8,16 +8,34 @@ export class ReplizSyncCron {
 
   constructor(private readonly syncService: ReplizSyncService) {}
 
-  // Jam 05:00 WIB. main.ts memaksa process.env.TZ = 'UTC', jadi timeZone
-  // ditulis eksplisit — tanpa itu cron akan jalan 05:00 UTC (12:00 WIB).
-  @Cron('0 5 * * *', {
-    name: 'repliz-sync-daily',
+  // Berjalan tiap jam, tapi tiap kali hanya menjalankan rule yang jam
+  // scrape-nya cocok (lihat scrapeTime pada rule). Ini menyebarkan beban:
+  // tanpa itu semua rule di-scrape sekaligus dan durasinya menumpuk
+  // sampai bertabrakan dengan jadwal terbit pertama.
+  //
+  // timeZone ditulis eksplisit karena main.ts memaksa process.env.TZ='UTC';
+  // tanpa itu jam yang dibandingkan akan meleset 7 jam dari WIB.
+  @Cron('0 * * * *', {
+    name: 'repliz-sync-hourly',
     timeZone: 'Asia/Jakarta',
   })
   async handleDailySync(): Promise<void> {
-    this.logger.log('Mulai sinkronisasi harian Repliz');
+    // Jam WIB saat ini — dihitung dari UTC karena proses berjalan di UTC.
+    const currentHour = Number(
+      new Intl.DateTimeFormat('en-GB', {
+        hour: '2-digit',
+        hour12: false,
+        timeZone: 'Asia/Jakarta',
+      }).format(new Date()),
+    );
+
+    this.logger.log(`Sinkronisasi Repliz — rule dengan jam scrape ${currentHour}:00`);
     try {
-      const results = await this.syncService.runAllActiveRules();
+      const results = await this.syncService.runAllActiveRules(currentHour);
+      if (results.length === 0) {
+        this.logger.log('Tidak ada rule terjadwal pada jam ini');
+        return;
+      }
       const totalScheduled = results.reduce(
         (sum, result) => sum + result.scheduled,
         0,

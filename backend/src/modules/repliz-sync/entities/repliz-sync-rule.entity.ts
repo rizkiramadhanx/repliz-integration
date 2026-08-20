@@ -44,6 +44,13 @@ export class ReplizSyncRuleEntity {
   @Column({ name: 'max_items', type: 'int', default: 25 })
   maxItems: number;
 
+  // Jam scrape rule ini dijalankan (HH:mm, WIB). Terpisah dari
+  // scheduleStartTime supaya beban scraping bisa disebar: rule yang terbit
+  // siang tidak perlu ikut di-scrape bersamaan pada dini hari. Cron berjalan
+  // tiap jam dan hanya menjalankan rule yang jamnya cocok.
+  @Column({ name: 'scrape_time', default: '05:00' })
+  scrapeTime: string;
+
   // Jam mulai posting pertama (format HH:mm, waktu lokal server) dan jarak
   // antar konten dalam menit — dipakai menyusun scheduleAt tiap konten.
   @Column({ name: 'schedule_start_time', default: '06:00' })

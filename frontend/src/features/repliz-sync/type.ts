@@ -5,6 +5,7 @@ export type typeDataReplizSyncRule = {
   replizAccountId: string;
   replizAccountLabel: string | null;
   maxItems: number;
+  scrapeTime: string;
   scheduleStartTime: string;
   scheduleIntervalMinutes: number;
   sourcePlatform: "instagram" | "facebook";

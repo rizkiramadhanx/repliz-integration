@@ -178,10 +178,10 @@ export default function PageReplizSync() {
       </Group>
 
       <Alert color="blue" variant="light" mb={16}>
-        Setiap hari pukul <b>05:00 WIB</b> sistem memeriksa postingan baru dari
-        akun target, lalu menjadwalkannya ke akun Repliz mulai jam yang
-        ditentukan tiap rule. Konten yang sudah pernah dikirim tidak akan
-        dikirim ulang.
+        Sistem memeriksa postingan baru sesuai <b>jam scrape</b> masing-masing
+        rule, lalu menjadwalkannya ke akun Repliz mulai jam yang ditentukan
+        tiap rule. Sebar jam scrape antar rule agar bebannya tidak menumpuk.
+        Konten yang sudah pernah dikirim tidak akan dikirim ulang.
       </Alert>
 
       <Group mb={12}>
@@ -283,6 +283,9 @@ export default function PageReplizSync() {
                   <Text size="sm">
                     {rule.scheduleStartTime} · tiap{" "}
                     {rule.scheduleIntervalMinutes}m
+                  </Text>
+                  <Text size="xs" c="dimmed">
+                    scrape {rule.scrapeTime ?? "05:00"}
                   </Text>
                   <Text size="xs" c="dimmed">
                     maks {rule.maxItems}

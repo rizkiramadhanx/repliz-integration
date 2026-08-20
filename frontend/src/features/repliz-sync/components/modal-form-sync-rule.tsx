@@ -36,6 +36,7 @@ export default function ModalFormSyncRule({
   const [targetUsernames, setTargetUsernames] = useState<string[]>([]);
   const [replizAccountId, setReplizAccountId] = useState<string | null>(null);
   const [maxItems, setMaxItems] = useState<number | string>(25);
+  const [scrapeTime, setScrapeTime] = useState("05:00");
   const [scheduleStartTime, setScheduleStartTime] = useState("06:00");
   const [scheduleIntervalMinutes, setScheduleIntervalMinutes] = useState<
     number | string
@@ -63,6 +64,7 @@ export default function ModalFormSyncRule({
     setTargetUsernames(rule?.targetUsernames ?? []);
     setReplizAccountId(rule?.replizAccountId ?? null);
     setMaxItems(rule?.maxItems ?? 25);
+    setScrapeTime(rule?.scrapeTime ?? "05:00");
     setScheduleStartTime(rule?.scheduleStartTime ?? "06:00");
     setScheduleIntervalMinutes(rule?.scheduleIntervalMinutes ?? 60);
     setSourcePlatform(rule?.sourcePlatform ?? "instagram");
@@ -89,6 +91,7 @@ export default function ModalFormSyncRule({
         ? `@${selected.username} (${selected.type})`
         : undefined,
       maxItems: Number(maxItems) || 25,
+      scrapeTime,
       scheduleStartTime,
       scheduleIntervalMinutes: Number(scheduleIntervalMinutes) || 60,
       sourcePlatform,
@@ -209,6 +212,13 @@ export default function ModalFormSyncRule({
           />
         </Group>
         <Group grow>
+          <TextInput
+            label="Jam scrape"
+            placeholder="05:00"
+            description="Kapan rule ini dicek. Sebar antar rule agar beban tidak menumpuk."
+            value={scrapeTime}
+            onChange={(e) => setScrapeTime(e.currentTarget.value)}
+          />
           <TextInput
             label="Mulai posting"
             placeholder="06:00"

@@ -356,11 +356,24 @@ export class ReplizSyncService {
     };
   }
 
-  async runAllActiveRules(): Promise<RunRuleResult[]> {
-    const rules = await this.ruleRepo.find({
+  // `onlyHour` diisi cron (0-23, WIB) supaya hanya rule yang jam scrape-nya
+  // cocok yang dijalankan — inilah yang menyebarkan beban. Dipanggil tanpa
+  // argumen (mis. dari tombol jalankan manual) berarti semua rule aktif.
+  async runAllActiveRules(onlyHour?: number): Promise<RunRuleResult[]> {
+    const allRules = await this.ruleRepo.find({
       where: { status: 'active' },
       order: { createdAt: 'ASC' },
     });
+
+    const rules =
+      onlyHour === undefined
+        ? allRules
+        : allRules.filter((rule) => {
+            // Rule lama tanpa scrapeTime diperlakukan 05:00 supaya
+            // perilakunya tidak berubah setelah pembaruan ini.
+            const [hour] = (rule.scrapeTime ?? '05:00').split(':');
+            return Number(hour) === onlyHour;
+          });
 
     const results: RunRuleResult[] = [];
     // Sengaja berurutan, bukan paralel: semua rule memakai satu akun
