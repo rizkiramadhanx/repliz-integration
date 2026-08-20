@@ -97,6 +97,18 @@ export class UrlImportService {
     };
 
     if (platform === 'tiktok') {
+      // Panggilan langsung ke API tikwm sebagai jalur utama: `ttdl` membungkus
+      // API yang sama, tapi kegagalannya sering berupa error internal yang
+      // tidak bisa dibedakan dari masalah jaringan. Memanggil langsung membuat
+      // status HTTP dan kode respons terbaca, sehingga retry lebih tepat
+      // sasaran dan pesan errornya lebih jelas.
+      try {
+        const data = await withRetry(() => this.fetchTiktokDirect(url));
+        if (data) return data;
+      } catch {
+        // Jatuh ke library sebagai cadangan.
+      }
+
       const data = await withRetry(() => scraper.ttdl(url));
       // `video` (H.264) diutamakan daripada `video_hd` yang memakai HEVC —
       // HEVC tidak didukung banyak pemutar dan berisiko ditolak Repliz.
@@ -120,6 +132,48 @@ export class UrlImportService {
       mediaUrl,
       caption: '',
       isVideo: !/\.(jpg|jpeg|png|webp)(\?|$)/i.test(mediaUrl),
+    };
+  }
+
+  // Memanggil API tikwm langsung. Dipisah dari library supaya kegagalannya
+  // bisa dibedakan: HTTP non-200 berarti layanan/jaringan bermasalah,
+  // sedangkan code != 0 berarti videonya yang tidak bisa diambil.
+  private async fetchTiktokDirect(url: string): Promise<ResolvedMedia | null> {
+    const endpoint = `https://www.tikwm.com/api/?url=${encodeURIComponent(url)}&hd=1`;
+    const response = await fetch(endpoint, {
+      headers: {
+        'user-agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        accept: 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`tikwm membalas HTTP ${response.status}`);
+    }
+
+    const body = (await response.json()) as {
+      code?: number;
+      msg?: string;
+      data?: { play?: string; hdplay?: string; title?: string };
+    };
+
+    if (body?.code !== 0 || !body?.data) {
+      throw new Error(body?.msg || 'tikwm tidak mengembalikan data');
+    }
+
+    // `play` (H.264 tanpa watermark) diutamakan daripada `hdplay` yang
+    // memakai HEVC — HEVC tidak didukung banyak pemutar dan berisiko
+    // ditolak Repliz.
+    const mediaUrl = body.data.play || body.data.hdplay;
+    if (!mediaUrl) return null;
+
+    return {
+      mediaUrl: mediaUrl.startsWith('http')
+        ? mediaUrl
+        : `https://www.tikwm.com${mediaUrl}`,
+      caption: body.data.title ?? '',
+      isVideo: true,
     };
   }
 
