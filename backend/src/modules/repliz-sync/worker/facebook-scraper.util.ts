@@ -12,6 +12,8 @@ const USER_AGENT =
 // media asli postingan dari ikon/emoji/sprite UI yang juga di-host di sana.
 const FB_MEDIA_HOST = /\.fbcdn\.net|\.fbsbx\.com/i;
 
+export type FacebookScrapeMode = 'posts' | 'reels';
+
 export interface ScrapedFacebookPost {
   postId: string;
   caption: string;
@@ -126,6 +128,18 @@ function normalizeProfilePath(target: string): string {
   return trimmed;
 }
 
+function buildProfileUrl(
+  profilePath: string,
+  scrapeMode: FacebookScrapeMode,
+): string {
+  const base = `https://web.facebook.com/${profilePath}`;
+  if (scrapeMode !== 'reels') return base;
+
+  const url = new URL(base);
+  url.searchParams.set('sk', 'reels_tab');
+  return url.toString();
+}
+
 async function readPostLinksFromDom(page: Page): Promise<
   { postId: string; href: string; isVideo: boolean }[]
 > {
@@ -177,10 +191,18 @@ async function listRecentPostLinks(
   target: string,
   limit: number,
   excludePostIds: Set<string>,
+  scrapeMode: FacebookScrapeMode = 'posts',
 ): Promise<{ postId: string; href: string; isVideo: boolean }[]> {
   const profilePath = normalizeProfilePath(target);
 
-  await page.goto(`https://web.facebook.com/${profilePath}`, {
+  // Tab Reels dibuka lewat query `sk=reels_tab`. Profil numerik memakai
+  // profile.php?id=... yang sudah punya query string, jadi pemisahnya harus
+  // '&' — memakai '?' di sana membuat URL tidak valid dan Facebook
+  // mengembalikan halaman kosong. `sk` yang sudah ada (mis. saat pengguna
+  // menempel URL tab Reels utuh) tidak digandakan.
+  const url = buildProfileUrl(profilePath, scrapeMode);
+
+  await page.goto(url, {
     waitUntil: 'domcontentloaded',
     timeout: 45000,
   });
@@ -313,6 +335,7 @@ export async function scrapeLatestFacebookPosts(
   target: string,
   limit = 5,
   excludePostIds: Set<string> = new Set(),
+  scrapeMode: FacebookScrapeMode = 'posts',
 ): Promise<ScrapedFacebookPost[]> {
   return withFacebookSession(browsingAccount, async (page) => {
     const links = await listRecentPostLinks(
@@ -320,6 +343,7 @@ export async function scrapeLatestFacebookPosts(
       target,
       limit,
       excludePostIds,
+      scrapeMode,
     );
     if (links.length === 0) return [];
 

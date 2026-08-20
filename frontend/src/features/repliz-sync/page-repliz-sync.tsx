@@ -18,6 +18,7 @@ import {
   Button,
   Checkbox,
   Group,
+  Loader,
   Modal,
   Pagination,
   Select,
@@ -86,10 +87,13 @@ export default function PageReplizSync() {
   const handleRun = (rule: typeDataReplizSyncRule) => {
     runRule(rule.id, {
       onSuccess: (res) => {
+        // Proses berjalan di server; pesan ini hanya konfirmasi bahwa
+        // permintaannya diterima. Hasil akhirnya muncul di kolom Run
+        // Terakhir setelah polling menangkap perubahan status.
         notifications.show({
-          title: "Selesai",
+          title: "Dimulai",
           message: res.message,
-          color: "green",
+          color: "blue",
         });
         refetch();
         refetchSynced();
@@ -288,10 +292,7 @@ export default function PageReplizSync() {
                     scrape {rule.scrapeTime ?? "05:00"}
                   </Text>
                   <Text size="xs" c="dimmed">
-                    maks {rule.maxItems}
-                    {rule.sourcePlatform !== "facebook"
-                      ? ` · ${rule.scrapeMode}`
-                      : ""}
+                    maks {rule.maxItems} · {rule.scrapeMode}
                   </Text>
                 </Table.Td>
                 <Table.Td>
@@ -303,7 +304,14 @@ export default function PageReplizSync() {
                   </Badge>
                 </Table.Td>
                 <Table.Td>
-                  {rule.lastRunAt ? (
+                  {rule.lastRunStatus === "running" ? (
+                    <Group gap={6} wrap="nowrap">
+                      <Loader size={14} />
+                      <Text size="xs" c="blue">
+                        Sedang berjalan…
+                      </Text>
+                    </Group>
+                  ) : rule.lastRunAt ? (
                     <>
                       <Text size="xs">
                         {dayjs(rule.lastRunAt).format("DD MMM YYYY HH:mm")}
@@ -325,11 +333,21 @@ export default function PageReplizSync() {
                 </Table.Td>
                 <Table.Td>
                   <Group gap={6} justify="center" wrap="nowrap">
-                    <Tooltip label="Jalankan sekarang">
+                    <Tooltip
+                      label={
+                        rule.lastRunStatus === "running"
+                          ? "Sedang berjalan…"
+                          : "Jalankan sekarang"
+                      }
+                    >
                       <ActionIcon
                         variant="light"
                         color="green"
-                        loading={isRunning}
+                        // Loading mengikuti status rule, bukan status request:
+                        // requestnya selesai seketika (fire-and-forget),
+                        // sedangkan prosesnya masih berjalan di server.
+                        loading={rule.lastRunStatus === "running" || isRunning}
+                        disabled={rule.lastRunStatus === "running"}
                         onClick={(e) => {
                           e.stopPropagation();
                           handleRun(rule);

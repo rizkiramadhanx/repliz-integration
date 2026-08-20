@@ -17,6 +17,19 @@ import {
 import { notifications } from "@mantine/notifications";
 import { useEffect, useState } from "react";
 
+// Untuk akun Page Facebook, Repliz mengisi `username` dengan KATEGORI Page
+// ("Recruiter", "Art Gallery", "Shopping & retail") — bukan username asli.
+// Memakainya sebagai label membuat semua Page terlihat mirip dan sulit
+// dibedakan, jadi `name` (nama Page sebenarnya) yang ditampilkan.
+function accountLabel(account: {
+  name?: string;
+  username?: string;
+  type?: string;
+}): string {
+  const displayName = account.name?.trim() || `@${account.username ?? ''}`;
+  return `${displayName} (${account.type ?? '-'})`;
+}
+
 type Props = {
   open: boolean;
   onClose: () => void;
@@ -87,9 +100,7 @@ export default function ModalFormSyncRule({
       label: label.trim(),
       targetUsernames,
       replizAccountId,
-      replizAccountLabel: selected
-        ? `@${selected.username} (${selected.type})`
-        : undefined,
+      replizAccountLabel: selected ? accountLabel(selected) : undefined,
       maxItems: Number(maxItems) || 25,
       scrapeTime,
       scheduleStartTime,
@@ -183,8 +194,9 @@ export default function ModalFormSyncRule({
           placeholder="Pilih akun"
           data={replizAccounts.map((a) => ({
             value: a.id,
-            label: `@${a.username} (${a.type})`,
+            label: accountLabel(a),
           }))}
+          searchable
           value={replizAccountId}
           onChange={setReplizAccountId}
           required
@@ -199,10 +211,6 @@ export default function ModalFormSyncRule({
           />
           <Select
             label="Jenis konten"
-            description={
-              sourcePlatform === "facebook" ? "Khusus Instagram" : undefined
-            }
-            disabled={sourcePlatform === "facebook"}
             data={[
               { value: "posts", label: "Posts" },
               { value: "reels", label: "Reels" },

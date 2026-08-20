@@ -15,6 +15,16 @@ export function useGetAllSyncRule() {
       }>({ method: "GET", url: "/api/repliz-sync/rule" });
       return response.data;
     },
+    // Endpoint jalankan bersifat fire-and-forget, jadi kemajuan tidak datang
+    // dari response-nya. Selama masih ada rule berstatus 'running', daftar
+    // di-refresh berkala; begitu semua selesai polling berhenti sendiri agar
+    // tidak membebani server tanpa alasan.
+    refetchInterval: (query) => {
+      const rules = query.state.data?.data ?? [];
+      return rules.some((rule) => rule.lastRunStatus === "running")
+        ? 5000
+        : false;
+    },
   });
 }
 

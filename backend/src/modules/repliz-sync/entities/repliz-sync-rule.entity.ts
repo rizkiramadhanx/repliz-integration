@@ -65,8 +65,8 @@ export class ReplizSyncRuleEntity {
   @Column({ name: 'source_platform', default: 'instagram' })
   sourcePlatform: ReplizSyncSourcePlatform;
 
-  // Khusus Instagram. Facebook tidak punya pemisahan posts/reels di level
-  // URL profil, jadi nilai ini diabaikan saat sourcePlatform = 'facebook'.
+  // Berlaku untuk kedua platform: Instagram memakai /reels/, Facebook
+  // memakai tab ?sk=reels_tab.
   @Column({ name: 'scrape_mode', default: 'posts' })
   scrapeMode: 'posts' | 'reels';
 

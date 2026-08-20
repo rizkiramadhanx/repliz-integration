@@ -140,6 +140,15 @@ export class ReplizSyncService {
     // gagal di langkah terakhir saat URL media ternyata tidak publik.
     assertPublicBaseUrlUsable();
 
+    // Ditandai sejak awal supaya UI bisa menampilkan indikator berjalan.
+    // Scraping bisa memakan beberapa menit, jadi endpoint pemicunya tidak
+    // menunggu selesai — status inilah yang dipantau frontend.
+    await this.ruleRepo.update(rule.id, {
+      lastRunStatus: 'running',
+      lastRunMessage: 'Sedang berjalan…',
+      lastRunAt: new Date(),
+    });
+
     const platform: ReplizSyncSourcePlatform =
       rule.sourcePlatform ?? 'instagram';
     const browsingAccount = await this.resolveBrowsingAccount(platform);
@@ -173,6 +182,7 @@ export class ReplizSyncService {
                   targetUsername,
                   rule.maxItems,
                   excludeShortcodes,
+                  rule.scrapeMode,
                 )
               ).map((post) => ({
                 shortcode: post.postId,
@@ -338,6 +348,25 @@ export class ReplizSyncService {
   // `onlyHour` diisi cron (0-23, WIB) supaya hanya rule yang jam scrape-nya
   // cocok yang dijalankan — inilah yang menyebarkan beban. Dipanggil tanpa
   // argumen (mis. dari tombol jalankan manual) berarti semua rule aktif.
+  // Menjalankan rule tanpa menunggu selesai. Dipakai endpoint pemicu manual
+  // agar request tidak menggantung selama scraping (bisa beberapa menit untuk
+  // puluhan konten) dan tidak kena timeout proxy. Kegagalan dicatat ke rule
+  // supaya tetap terlihat di UI, karena tidak ada pemanggil yang menunggunya.
+  runRuleInBackground(ruleId: string): void {
+    void this.runRule(ruleId).catch(async (error) => {
+      const message =
+        error instanceof Error ? error.message : 'Gagal menjalankan rule';
+      this.logger.error(`Rule ${ruleId} gagal di background: ${message}`);
+      await this.ruleRepo
+        .update(ruleId, {
+          lastRunAt: new Date(),
+          lastRunStatus: 'failed',
+          lastRunMessage: message,
+        })
+        .catch(() => undefined);
+    });
+  }
+
   async runAllActiveRules(onlyHour?: number): Promise<RunRuleResult[]> {
     const allRules = await this.ruleRepo.find({
       where: { status: 'active' },

@@ -164,22 +164,40 @@ export class ReplizSyncController {
     return createSuccessResponse('Rule berhasil dihapus', { id });
   }
 
+  // Fire-and-forget: scraping bisa berjalan beberapa menit, jadi request
+  // tidak menunggu sampai selesai — menunggu akan membuat browser/proxy
+  // timeout dan pengguna tidak tahu apakah prosesnya masih jalan. Kemajuannya
+  // dipantau lewat lastRunStatus pada rule ('running' -> 'success'/'failed').
   @Post('rule/:id/run')
   @Permissions('repliz-sync:run')
   async runRule(
     @Param('id', ParseUUIDPipe) id: string,
     @Res({ passthrough: true }) res: Response,
   ) {
-    try {
-      const result = await this.syncService.runRule(id);
-      res.status(HttpStatus.OK);
-      return createSuccessResponse(result.message, result);
-    } catch (err) {
-      const message =
-        err instanceof Error ? err.message : 'Gagal menjalankan rule';
-      res.status(HttpStatus.BAD_REQUEST);
-      return createErrorResponse(message, HttpStatus.BAD_REQUEST);
+    const rule = await this.ruleRepo.findOne({ where: { id } });
+    if (!rule) {
+      res.status(HttpStatus.NOT_FOUND);
+      return createErrorResponse('Rule tidak ditemukan', HttpStatus.NOT_FOUND);
     }
+
+    // Mencegah rule yang sama dijalankan dua kali bersamaan: dua sesi scraping
+    // paralel memakai satu akun pemantau justru memicu deteksi otomatis, dan
+    // bisa menjadwalkan konten yang sama dua kali.
+    if (rule.lastRunStatus === 'running') {
+      res.status(HttpStatus.CONFLICT);
+      return createErrorResponse(
+        'Rule ini sedang berjalan, tunggu sampai selesai',
+        HttpStatus.CONFLICT,
+      );
+    }
+
+    this.syncService.runRuleInBackground(id);
+
+    res.status(HttpStatus.ACCEPTED);
+    return createSuccessResponse(
+      'Sinkronisasi dimulai — pantau kolom Run Terakhir',
+      { ruleId: id, started: true },
+    );
   }
 
   @Get('synced-post')
