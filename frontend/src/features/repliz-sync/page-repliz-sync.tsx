@@ -248,13 +248,15 @@ export default function PageReplizSync() {
                     size="xs"
                     variant="light"
                     color={
-                      rule.sourcePlatform === "facebook" ? "blue" : "pink"
+                      rule.sourcePlatform === "facebook"
+                        ? "blue"
+                        : rule.sourcePlatform === "tiktok"
+                          ? "dark"
+                          : "pink"
                     }
                     mb={4}
                   >
-                    {rule.sourcePlatform === "facebook"
-                      ? "facebook"
-                      : "instagram"}
+                    {rule.sourcePlatform ?? "instagram"}
                   </Badge>
                   <Group gap={6} wrap="wrap">
                     {(rule.targetUsernames ?? []).map((username) => (
@@ -263,7 +265,9 @@ export default function PageReplizSync() {
                         href={
                           rule.sourcePlatform === "facebook"
                             ? `https://www.facebook.com/${username}`
-                            : `https://www.instagram.com/${username}`
+                            : rule.sourcePlatform === "tiktok"
+                              ? `https://www.tiktok.com/@${username}`
+                              : `https://www.instagram.com/${username}`
                         }
                         target="_blank"
                         rel="noopener noreferrer"
@@ -292,7 +296,10 @@ export default function PageReplizSync() {
                     scrape {rule.scrapeTime ?? "05:00"}
                   </Text>
                   <Text size="xs" c="dimmed">
-                    maks {rule.maxItems} · {rule.scrapeMode}
+                    maks {rule.maxItems}
+                    {rule.sourcePlatform !== "tiktok"
+                      ? ` · ${rule.scrapeMode}`
+                      : ""}
                   </Text>
                 </Table.Td>
                 <Table.Td>

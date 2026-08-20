@@ -10,6 +10,7 @@ import { z } from "zod";
 
 const ACCOUNT_TYPE_OPTIONS = [
   { value: "instagram", label: "Instagram" },
+  { value: "tiktok", label: "TikTok" },
   { value: "twitter", label: "Twitter / X" },
   { value: "telegram", label: "Telegram" },
   { value: "facebook", label: "Facebook" },
@@ -18,7 +19,14 @@ const ACCOUNT_TYPE_OPTIONS = [
 
 const schema = z.object({
   label: z.string().min(1, "Label wajib diisi").max(255),
-  type: z.enum(["instagram", "twitter", "telegram", "facebook", "discord"], {
+  type: z.enum([
+    "instagram",
+    "tiktok",
+    "twitter",
+    "telegram",
+    "facebook",
+    "discord",
+  ], {
     errorMap: () => ({ message: "Pilih tipe akun" }),
   }),
   credentials: z.record(z.string(), z.unknown()),

@@ -84,7 +84,12 @@ export default function CredentialsFields({
   value: Record<string, unknown>;
   onChange: (value: Record<string, unknown>) => void;
 }) {
-  if (type === "twitter" || type === "facebook" || type === "instagram") {
+  if (
+    type === "twitter" ||
+    type === "facebook" ||
+    type === "instagram" ||
+    type === "tiktok"
+  ) {
     return (
       <>
         <TextInput

@@ -253,7 +253,7 @@ export default function PageAccount() {
               accounts.map((account: typeDataAccount) => (
                 <Table.Tr key={account.id}>
                   <Table.Td>
-                    {["facebook", "instagram", "twitter"].includes(
+                    {["facebook", "instagram", "twitter", "tiktok"].includes(
                       account.type,
                     ) && account.profile_url ? (
                       <Text

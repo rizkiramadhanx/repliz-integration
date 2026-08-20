@@ -87,7 +87,7 @@ export type typeCreateSyncRulePayload = {
   scrapeTime?: string;
   scheduleStartTime?: string;
   scheduleIntervalMinutes?: number;
-  sourcePlatform?: "instagram" | "facebook";
+  sourcePlatform?: "instagram" | "facebook" | "tiktok";
   scrapeMode?: "posts" | "reels";
   status?: "active" | "paused";
 };

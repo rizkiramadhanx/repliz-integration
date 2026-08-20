@@ -74,8 +74,8 @@ export class CreateReplizSyncRuleDto {
   scheduleIntervalMinutes?: number;
 
   @IsOptional()
-  @IsIn(['instagram', 'facebook'])
-  sourcePlatform?: 'instagram' | 'facebook';
+  @IsIn(['instagram', 'facebook', 'tiktok'])
+  sourcePlatform?: 'instagram' | 'facebook' | 'tiktok';
 
   @IsOptional()
   @IsIn(['posts', 'reels'])

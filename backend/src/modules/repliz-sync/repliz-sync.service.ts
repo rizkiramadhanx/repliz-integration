@@ -10,6 +10,7 @@ import {
 import { ReplizSyncedPostEntity } from './entities/repliz-synced-post.entity';
 import { scrapeLatestInstagramPosts } from './worker/instagram-scraper.util';
 import { scrapeLatestFacebookPosts } from './worker/facebook-scraper.util';
+import { scrapeLatestTiktokPosts } from './worker/tiktok-scraper.util';
 import {
   assertPublicBaseUrlUsable,
   REPLIZ_MEDIA_SUBDIR,
@@ -176,7 +177,22 @@ export class ReplizSyncService {
         // `shortcode` menampung id postingan Facebook agar kunci anti-duplikat
         // yang sudah ada tetap dipakai tanpa kolom tambahan.
         const posts =
-          platform === 'facebook'
+          platform === 'tiktok'
+            ? (
+                await scrapeLatestTiktokPosts(
+                  browsingAccount,
+                  targetUsername,
+                  rule.maxItems,
+                  excludeShortcodes,
+                )
+              ).map((post) => ({
+                shortcode: post.videoId,
+                caption: post.caption,
+                mediaUrl: post.mediaUrl,
+                isVideo: post.isVideo,
+                postUrl: post.postUrl,
+              }))
+            : platform === 'facebook'
             ? (
                 await scrapeLatestFacebookPosts(
                   browsingAccount,

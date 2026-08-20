@@ -55,7 +55,7 @@ export default function ModalFormSyncRule({
     number | string
   >(60);
   const [sourcePlatform, setSourcePlatform] = useState<
-    "instagram" | "facebook"
+    "instagram" | "facebook" | "tiktok"
   >("instagram");
   const [scrapeMode, setScrapeMode] = useState<"posts" | "reels">("posts");
   const [status, setStatus] = useState<"active" | "paused">("active");
@@ -158,10 +158,13 @@ export default function ModalFormSyncRule({
           data={[
             { value: "instagram", label: "Instagram" },
             { value: "facebook", label: "Facebook" },
+            { value: "tiktok", label: "TikTok" },
           ]}
           value={sourcePlatform}
           onChange={(v) =>
-            setSourcePlatform((v as "instagram" | "facebook") ?? "instagram")
+            setSourcePlatform(
+              (v as "instagram" | "facebook" | "tiktok") ?? "instagram",
+            )
           }
         />
         <TagsInput
@@ -170,7 +173,9 @@ export default function ModalFormSyncRule({
           description={
             sourcePlatform === "facebook"
               ? "Username/ID Page atau profil Facebook. Bisa lebih dari satu — pisahkan dengan Enter atau koma."
-              : "Username Instagram tanpa @. Bisa lebih dari satu — pisahkan dengan Enter atau koma."
+              : sourcePlatform === "tiktok"
+                ? "Username TikTok tanpa @. Bisa lebih dari satu — pisahkan dengan Enter atau koma."
+                : "Username Instagram tanpa @. Bisa lebih dari satu — pisahkan dengan Enter atau koma."
           }
           data={[]}
           value={targetUsernames}
@@ -211,6 +216,10 @@ export default function ModalFormSyncRule({
           />
           <Select
             label="Jenis konten"
+            description={
+              sourcePlatform === "tiktok" ? "Tidak dipakai untuk TikTok" : undefined
+            }
+            disabled={sourcePlatform === "tiktok"}
             data={[
               { value: "posts", label: "Posts" },
               { value: "reels", label: "Reels" },

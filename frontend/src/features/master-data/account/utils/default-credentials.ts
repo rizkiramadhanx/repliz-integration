@@ -6,6 +6,7 @@ export function defaultCredentials(
   switch (type) {
     case "twitter":
     case "facebook":
+    case "tiktok":
     case "instagram":
       return { cookies: [], username: "" };
     case "telegram":

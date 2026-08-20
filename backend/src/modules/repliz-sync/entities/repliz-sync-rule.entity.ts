@@ -7,7 +7,7 @@ import {
 } from 'typeorm';
 
 export type ReplizSyncRuleStatus = 'active' | 'paused';
-export type ReplizSyncSourcePlatform = 'instagram' | 'facebook';
+export type ReplizSyncSourcePlatform = 'instagram' | 'facebook' | 'tiktok';
 
 // Model: x -> z -> y
 //   x = akun pemantau (cookies IG) yang membuka Instagram untuk membaca.

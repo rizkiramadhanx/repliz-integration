@@ -8,7 +8,7 @@ export type typeDataReplizSyncRule = {
   scrapeTime: string;
   scheduleStartTime: string;
   scheduleIntervalMinutes: number;
-  sourcePlatform: "instagram" | "facebook";
+  sourcePlatform: "instagram" | "facebook" | "tiktok";
   scrapeMode: "posts" | "reels";
   status: "active" | "paused";
   lastRunAt: string | null;

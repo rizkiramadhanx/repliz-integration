@@ -3,6 +3,7 @@ export type typeAccountType =
   | "telegram"
   | "facebook"
   | "instagram"
+  | "tiktok"
   | "discord";
 
 export type typeDataAccount = {
