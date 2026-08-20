@@ -1,5 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { In, Repository } from 'typeorm';
 import { ReplizService } from '../repliz/repliz.service';
+import { UrlImportHistoryEntity } from './entities/url-import-history.entity';
 import {
   assertPublicBaseUrlUsable,
   buildPublicUrl,
@@ -14,6 +17,10 @@ export type ImportUrlResult = {
   scheduledAt?: string;
   caption?: string;
   error?: string;
+  // URL ini pernah diimpor ke akun yang sama sebelumnya. Sekadar penanda —
+  // kontennya tetap diproses, karena mengulang bisa saja disengaja.
+  duplicate?: boolean;
+  previousScheduledAt?: string;
 };
 
 export type ImportUrlsParams = {
@@ -49,7 +56,11 @@ const MAX_URLS_PER_IMPORT = 100;
 export class UrlImportService {
   private readonly logger = new Logger(UrlImportService.name);
 
-  constructor(private readonly replizService: ReplizService) {}
+  constructor(
+    private readonly replizService: ReplizService,
+    @InjectRepository(UrlImportHistoryEntity)
+    private readonly historyRepo: Repository<UrlImportHistoryEntity>,
+  ) {}
 
   // URL dinormalkan lebih dulu supaya bentuk yang berbeda-beda (dengan query
   // pelacakan, tanpa https, atau berupa tautan pendek) tetap dikenali.
@@ -322,6 +333,17 @@ export class UrlImportService {
 
     const results: ImportUrlResult[] = [];
 
+    // Riwayat dibaca sekali di awal, bukan per URL, supaya tidak ada query
+    // berulang untuk daftar yang bisa mencapai ratusan.
+    const previous = await this.historyRepo.find({
+      where: { replizAccountId, url: In(urls) },
+      order: { createdAt: 'DESC' },
+    });
+    const previousByUrl = new Map<string, UrlImportHistoryEntity>();
+    for (const row of previous) {
+      if (!previousByUrl.has(row.url)) previousByUrl.set(row.url, row);
+    }
+
     // Slot yang sudah terpakai di akun tujuan ikut dihitung, sehingga batas
     // harian berlaku PER AKUN — bukan sekadar per impor.
     const usedPerDay = await this.countScheduledPerDay(replizAccountId);
@@ -380,12 +402,29 @@ export class UrlImportService {
             : {}),
         });
 
+        // Dicatat setelah Repliz menerima, bukan sebelum: mencatat lebih awal
+        // akan menandai URL sebagai "pernah diimpor" walau penjadwalannya
+        // gagal.
+        await this.historyRepo
+          .save(
+            this.historyRepo.create({
+              url,
+              replizAccountId,
+              replizScheduleId: created.scheduleId,
+              scheduledAt,
+            }),
+          )
+          .catch(() => undefined);
+
+        const before = previousByUrl.get(url);
         results.push({
           url,
           ok: true,
           scheduleId: created.scheduleId,
           scheduledAt: scheduledAt.toISOString(),
           caption: media.caption,
+          duplicate: Boolean(before),
+          previousScheduledAt: before?.scheduledAt?.toISOString(),
         });
       } catch (error) {
         // Satu URL gagal tidak menghentikan sisanya; hasilnya dilaporkan

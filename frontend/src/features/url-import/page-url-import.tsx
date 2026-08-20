@@ -113,6 +113,14 @@ export default function PageUrlImport() {
       {
         onSuccess: (res) => {
           setResults(res.data.results);
+          const dup = res.data.results.filter((r) => r.duplicate).length;
+          if (dup > 0) {
+            notifications.show({
+              title: "Ada URL duplikat",
+              message: `${dup} URL pernah diimpor ke akun ini sebelumnya dan tetap dijadwalkan ulang.`,
+              color: "orange",
+            });
+          }
           notifications.show({
             title: res.data.success === res.data.total ? "Sukses" : "Sebagian gagal",
             message: res.message,
@@ -272,12 +280,27 @@ export default function PageUrlImport() {
                       </Text>
                     </Table.Td>
                     <Table.Td>
-                      <Badge
-                        color={result.ok ? "green" : "red"}
-                        variant="light"
-                      >
-                        {result.ok ? "terjadwal" : "gagal"}
-                      </Badge>
+                      <Group gap={4} wrap="wrap">
+                        <Badge
+                          color={result.ok ? "green" : "red"}
+                          variant="light"
+                        >
+                          {result.ok ? "terjadwal" : "gagal"}
+                        </Badge>
+                        {result.duplicate && (
+                          <Badge color="orange" variant="light">
+                            duplikat
+                          </Badge>
+                        )}
+                      </Group>
+                      {result.duplicate && result.previousScheduledAt && (
+                        <Text size="xs" c="orange">
+                          Pernah diimpor{" "}
+                          {dayjs(result.previousScheduledAt).format(
+                            "DD MMM HH:mm",
+                          )}
+                        </Text>
+                      )}
                       {result.error && (
                         <Text size="xs" c="red" lineClamp={2}>
                           {result.error}

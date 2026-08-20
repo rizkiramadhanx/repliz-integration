@@ -8,6 +8,8 @@ export type typeImportUrlResult = {
   scheduledAt?: string;
   caption?: string;
   error?: string;
+  duplicate?: boolean;
+  previousScheduledAt?: string;
 };
 
 export type typeImportUrlsPayload = {

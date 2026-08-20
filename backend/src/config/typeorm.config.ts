@@ -8,6 +8,7 @@ import { AccountEntity } from '../modules/accounts/entities/account.entity';
 import { AccountDelegationEntity } from '../modules/accounts/entities/account-delegation.entity';
 import { ReplizSyncRuleEntity } from '../modules/repliz-sync/entities/repliz-sync-rule.entity';
 import { ReplizSyncedPostEntity } from '../modules/repliz-sync/entities/repliz-synced-post.entity';
+import { UrlImportHistoryEntity } from '../modules/repliz-sync/entities/url-import-history.entity';
 
 config();
 
@@ -32,6 +33,7 @@ export default new DataSource({
     AccountDelegationEntity,
     ReplizSyncRuleEntity,
     ReplizSyncedPostEntity,
+    UrlImportHistoryEntity,
   ],
   migrations: [join(__dirname, '..', 'migration', `*.${migrationExt}`)],
   synchronize: false,
