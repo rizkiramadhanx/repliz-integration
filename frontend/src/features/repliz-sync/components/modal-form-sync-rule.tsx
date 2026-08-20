@@ -154,11 +154,10 @@ export default function ModalFormSyncRule({
         />
         <Select
           label="Platform sumber"
-          description="Akun pemantau yang dipakai menyesuaikan platform ini"
+          description="TikTok tidak tersedia di sini — pakai menu Impor URL"
           data={[
             { value: "instagram", label: "Instagram" },
             { value: "facebook", label: "Facebook" },
-            { value: "tiktok", label: "TikTok" },
           ]}
           value={sourcePlatform}
           onChange={(v) =>

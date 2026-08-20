@@ -5,7 +5,7 @@ import { BiUser } from "react-icons/bi";
 import { FaDatabase } from "react-icons/fa";
 import { HiShieldCheck } from "react-icons/hi";
 import { MdHelpOutline } from "react-icons/md";
-import { TbBrandCampaignmonitor, TbRefreshDot } from "react-icons/tb";
+import { TbBrandCampaignmonitor, TbRefreshDot, TbLink } from "react-icons/tb";
 import { FaUserShield } from "react-icons/fa6";
 
 export type SidebarMenuChild = {
@@ -60,6 +60,12 @@ const SidebarMenu: SidebarMenuItem[] = [
     icon: <TbRefreshDot />,
     path: ROUTES.ReplizSync.View,
     modules: [MODULE_LIST.ReplizSync.Read],
+  },
+  {
+    title: "Impor URL",
+    icon: <TbLink />,
+    path: ROUTES.UrlImport.View,
+    modules: [MODULE_LIST.ReplizSync.Create],
   },
   {
     title: "Panduan",

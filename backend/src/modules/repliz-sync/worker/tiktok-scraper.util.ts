@@ -253,9 +253,13 @@ async function fetchVideoDetail(
       ),
     ]);
 
-    // `video_hd` diutamakan; `video` (tanpa watermark) sebagai cadangan.
-    // `video_wm` sengaja dilewati karena memuat watermark TikTok.
-    const mediaUrl = data?.video_hd || data?.video || null;
+    // `video` diutamakan meski namanya bukan "hd": varian `video_hd` dari
+    // TikTok memakai codec HEVC/H.265 (diuji pada beberapa video, konsisten),
+    // yang tidak didukung banyak pemutar dan berisiko ditolak Repliz.
+    // `video` memakai H.264 yang kompatibel luas — dan ukurannya pun sering
+    // lebih besar, jadi kualitasnya tidak kalah.
+    // `video_wm` sengaja tidak dipakai karena memuat watermark TikTok.
+    const mediaUrl = data?.video || data?.video_hd || null;
     if (!mediaUrl) return null;
 
     return {

@@ -20,6 +20,9 @@ export const ROUTES = {
   ReplizSync: {
     View: "/repliz-sync",
   },
+  UrlImport: {
+    View: "/url-import",
+  },
   Guide: {
     View: "/guide",
   },

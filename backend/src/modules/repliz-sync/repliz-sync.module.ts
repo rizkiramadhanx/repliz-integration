@@ -7,6 +7,7 @@ import { ReplizSyncRuleEntity } from './entities/repliz-sync-rule.entity';
 import { ReplizSyncedPostEntity } from './entities/repliz-synced-post.entity';
 import { ReplizSyncController } from './repliz-sync.controller';
 import { ReplizSyncService } from './repliz-sync.service';
+import { UrlImportService } from './url-import.service';
 import { ReplizSyncCron } from './repliz-sync.cron';
 
 @Module({
@@ -20,7 +21,7 @@ import { ReplizSyncCron } from './repliz-sync.cron';
     ReplizModule,
   ],
   controllers: [ReplizSyncController],
-  providers: [ReplizSyncService, ReplizSyncCron],
+  providers: [ReplizSyncService, UrlImportService, ReplizSyncCron],
   exports: [ReplizSyncService],
 })
 export class ReplizSyncModule {}

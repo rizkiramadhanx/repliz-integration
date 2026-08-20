@@ -5,6 +5,7 @@ import { BrowserRouter, useRoutes } from "react-router";
 import MasterDataRoutes from "@/routes/master-data";
 import ReplizRoutes from "@/routes/repliz";
 import ReplizSyncRoutes from "@/routes/repliz-sync";
+import UrlImportRoutes from "@/routes/url-import";
 
 function AllRoutes() {
   const routes = useRoutes([
@@ -12,6 +13,7 @@ function AllRoutes() {
     ...MasterDataRoutes,
     ...ReplizRoutes,
     ...ReplizSyncRoutes,
+    ...UrlImportRoutes,
     ...GuideRoutes,
     {
       path: "*",

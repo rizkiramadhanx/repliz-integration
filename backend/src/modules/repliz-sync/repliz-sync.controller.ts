@@ -23,6 +23,7 @@ import {
   createErrorResponse,
 } from '../../common/type/response';
 import { ReplizSyncService } from './repliz-sync.service';
+import { UrlImportService } from './url-import.service';
 import { ReplizService } from '../repliz/repliz.service';
 import { In } from 'typeorm';
 import { ReplizSyncRuleEntity } from './entities/repliz-sync-rule.entity';
@@ -38,6 +39,7 @@ import {
 export class ReplizSyncController {
   constructor(
     private readonly syncService: ReplizSyncService,
+    private readonly urlImportService: UrlImportService,
     private readonly replizService: ReplizService,
     @InjectRepository(ReplizSyncRuleEntity)
     private readonly ruleRepo: Repository<ReplizSyncRuleEntity>,
@@ -198,6 +200,71 @@ export class ReplizSyncController {
       'Sinkronisasi dimulai — pantau kolom Run Terakhir',
       { ruleId: id, started: true },
     );
+  }
+
+  // Impor manual dari daftar URL yang disalin lewat extension browser.
+  // Dipakai untuk platform yang listing profilnya diblokir (mis. TikTok
+  // menampilkan CAPTCHA pada sesi otomatis) — URL diambil di browser
+  // pengguna yang sudah login, lalu ditempel di sini.
+  @Post('import-urls')
+  @Permissions('repliz-sync:create')
+  async importUrls(
+    @Body()
+    body: {
+      urls?: string[] | string;
+      replizAccountId?: string;
+      startTime?: string;
+      intervalMinutes?: number;
+    },
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const rawUrls = Array.isArray(body?.urls)
+      ? body.urls
+      : String(body?.urls ?? '').split(/[\r\n,\s]+/);
+
+    const urls = Array.from(
+      new Set(
+        rawUrls
+          .map((url) => String(url).trim())
+          .filter((url) => /^https?:\/\//i.test(url)),
+      ),
+    );
+
+    if (urls.length === 0) {
+      res.status(HttpStatus.BAD_REQUEST);
+      return createErrorResponse(
+        'Tidak ada URL valid. Tempel URL lengkap diawali http(s)://',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+    if (!body?.replizAccountId) {
+      res.status(HttpStatus.BAD_REQUEST);
+      return createErrorResponse(
+        'Pilih akun Repliz tujuan',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    try {
+      const results = await this.urlImportService.importUrls({
+        urls,
+        replizAccountId: body.replizAccountId,
+        startTime: body.startTime,
+        intervalMinutes: body.intervalMinutes,
+      });
+
+      const ok = results.filter((r) => r.ok).length;
+      res.status(HttpStatus.OK);
+      return createSuccessResponse(
+        `${ok} dari ${results.length} URL berhasil dijadwalkan`,
+        { results, total: results.length, success: ok },
+      );
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : 'Gagal mengimpor URL';
+      res.status(HttpStatus.BAD_REQUEST);
+      return createErrorResponse(message, HttpStatus.BAD_REQUEST);
+    }
   }
 
   @Get('synced-post')

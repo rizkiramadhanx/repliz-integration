@@ -1,0 +1,17 @@
+{
+  "manifest_version": 3,
+  "name": "Ternak Sosmed — Pengambil URL Konten",
+  "version": "1.0.0",
+  "description": "Mengambil daftar URL video/post dari halaman profil TikTok, Instagram, dan Facebook untuk disalin ke Sinkronisasi Repliz.",
+  "permissions": ["activeTab", "scripting", "clipboardWrite"],
+  "host_permissions": [
+    "https://www.tiktok.com/*",
+    "https://www.instagram.com/*",
+    "https://www.facebook.com/*",
+    "https://web.facebook.com/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Ambil URL konten"
+  }
+}
