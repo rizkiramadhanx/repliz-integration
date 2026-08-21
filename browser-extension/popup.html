@@ -30,6 +30,7 @@
       }
       button:disabled { opacity: .6; cursor: default; }
       button.secondary { background: #495057; margin-top: 6px; }
+    button.danger { background: #c92a2a; margin-top: 6px; }
       textarea {
         width: 100%; box-sizing: border-box; height: 132px; margin-top: 10px;
         font: 11px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -49,11 +50,12 @@
 
     <div class="row">
       <label for="limit">Maksimal</label>
-      <input type="number" id="limit" value="25" min="1" max="200" />
+      <input type="number" id="limit" value="25" min="1" max="2000" />
       <label for="limit">URL</label>
     </div>
 
     <button id="grab">Ambil URL</button>
+    <button id="stop" class="danger" disabled>Berhenti</button>
     <button id="copy" class="secondary" disabled>Salin ke clipboard</button>
 
     <div class="status" id="status"></div>
