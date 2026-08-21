@@ -1,8 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { ReplizService } from '../repliz/repliz.service';
 import { UrlImportHistoryEntity } from './entities/url-import-history.entity';
+import { UrlImportJobEntity } from './entities/url-import-job.entity';
 import {
   assertPublicBaseUrlUsable,
   buildPublicUrl,
@@ -26,6 +27,9 @@ export type ImportUrlResult = {
 export type ImportUrlsParams = {
   urls: string[];
   replizAccountId: string;
+  // Diisi saat impor dijalankan sebagai job latar. Dipakai untuk menautkan
+  // tiap baris riwayat ke batch-nya sekaligus memperbarui kemajuan.
+  jobId?: string;
   // Tanggal mulai (YYYY-MM-DD). Bila kosong, dipakai hari ini — dan digeser
   // ke besok bila jam mulainya sudah lewat.
   startDate?: string;
@@ -49,20 +53,135 @@ type ResolvedMedia = {
 // berikutnya di tengah jalan.
 const MAX_SLOTS_PER_DAY = 24;
 
-// Batas URL per satu kali impor. Tiap URL memerlukan unduhan media dan satu
-// panggilan ke Repliz, jadi ratusan URL sekaligus membuat request menggantung
-// sangat lama dan sulit dipantau. Sisanya bisa diimpor pada batch berikutnya.
-const MAX_URLS_PER_IMPORT = 100;
+// Batas URL per satu kali impor. Tiap URL mengunduh media ke disk VPS, jadi
+// batas ini menjaga ruang penyimpanan sekaligus memori proses.
+const MAX_URLS_PER_IMPORT = 2000;
+
+// Jeda antar panggilan ke Repliz. Repliz belum mendokumentasikan batas laju,
+// dan pada pengujian 180 POST beruntun tidak ada yang ditolak — tapi ribuan
+// URL adalah beban yang jauh berbeda, jadi laju sengaja ditahan daripada
+// menunggu sampai ditolak dan kehilangan sebagian jadwal.
+const REPLIZ_CALL_DELAY_MS = 400;
+
+// Jeda tambahan setiap satu batch selesai, memberi ruang bagi Repliz dan
+// bagi I/O disk untuk menyusul.
+const BATCH_SIZE = 25;
+const BATCH_PAUSE_MS = 2000;
 
 @Injectable()
-export class UrlImportService {
+export class UrlImportService implements OnModuleInit {
   private readonly logger = new Logger(UrlImportService.name);
 
   constructor(
     private readonly replizService: ReplizService,
     @InjectRepository(UrlImportHistoryEntity)
     private readonly historyRepo: Repository<UrlImportHistoryEntity>,
+    @InjectRepository(UrlImportJobEntity)
+    private readonly jobRepo: Repository<UrlImportJobEntity>,
   ) {}
+
+  // Job berjalan di memori proses, jadi restart server (deploy, crash)
+  // meninggalkannya berstatus 'running' selamanya. Ditandai gagal saat start
+  // supaya tidak terlihat menggantung, dan URL-nya bisa diulang lewat
+  // tombol "Ulangi gagal".
+  async onModuleInit(): Promise<void> {
+    const stale = await this.jobRepo
+      .find({ where: { status: 'running' } })
+      .catch(() => []);
+    if (stale.length === 0) return;
+
+    for (const job of stale) {
+      await this.jobRepo
+        .update(job.id, {
+          status: 'failed',
+          message:
+            'Server dimulai ulang saat impor berjalan. URL yang belum diproses bisa diulang.',
+          finishedAt: new Date(),
+        })
+        .catch(() => undefined);
+    }
+    this.logger.warn(
+      `${stale.length} job impor ditandai gagal karena server dimulai ulang`,
+    );
+  }
+
+  private sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  // Membuat job lalu menjalankannya TANPA ditunggu. Impor ribuan URL bisa
+  // memakan puluhan menit — jauh melewati batas 100 detik Cloudflare — jadi
+  // pemanggil hanya menerima jobId dan memantau kemajuannya lewat riwayat.
+  async startImportJob(
+    params: ImportUrlsParams & { replizAccountName?: string },
+  ): Promise<UrlImportJobEntity> {
+    // Divalidasi sebelum job dibuat supaya kesalahan konfigurasi langsung
+    // terlihat sebagai error request, bukan sebagai job yang gagal diam-diam.
+    assertPublicBaseUrlUsable();
+
+    if (params.urls.length === 0) {
+      throw new Error('Tidak ada URL yang bisa diimpor');
+    }
+    if (params.urls.length > MAX_URLS_PER_IMPORT) {
+      throw new Error(
+        `Terlalu banyak URL (${params.urls.length}). Maksimal ${MAX_URLS_PER_IMPORT} per sekali impor.`,
+      );
+    }
+
+    const job = await this.jobRepo.save(
+      this.jobRepo.create({
+        replizAccountId: params.replizAccountId,
+        replizAccountName: params.replizAccountName ?? null,
+        status: 'running',
+        total: params.urls.length,
+        processed: 0,
+        success: 0,
+        failed: 0,
+        startDate: params.startDate ?? null,
+        startTime: params.startTime ?? '06:00',
+        intervalMinutes: params.intervalMinutes ?? 60,
+        autoAddMusic: params.autoAddMusic ?? false,
+        urls: params.urls,
+      }),
+    );
+
+    void this.runImportJob(job.id, params);
+    return job;
+  }
+
+  private async runImportJob(
+    jobId: string,
+    params: ImportUrlsParams,
+  ): Promise<void> {
+    try {
+      const results = await this.importUrls({ ...params, jobId });
+      const failed = results.filter((r) => !r.ok).length;
+      await this.jobRepo.update(jobId, {
+        status: 'done',
+        processed: results.length,
+        success: results.length - failed,
+        failed,
+        finishedAt: new Date(),
+        message:
+          failed > 0
+            ? `${results.length - failed} berhasil, ${failed} gagal`
+            : `${results.length} berhasil`,
+      });
+    } catch (error) {
+      // Kegagalan di sini berarti seluruh job berhenti (mis. konfigurasi
+      // media publik tidak valid), bukan sekadar satu URL bermasalah.
+      const message =
+        error instanceof Error ? error.message : 'Job impor gagal';
+      this.logger.error(`Job impor ${jobId} gagal: ${message}`);
+      await this.jobRepo
+        .update(jobId, {
+          status: 'failed',
+          message,
+          finishedAt: new Date(),
+        })
+        .catch(() => undefined);
+    }
+  }
 
   // URL dinormalkan lebih dulu supaya bentuk yang berbeda-beda (dengan query
   // pelacakan, tanpa https, atau berupa tautan pendek) tetap dikenali.
@@ -407,6 +526,7 @@ export class UrlImportService {
       startTime = '06:00',
       intervalMinutes = 60,
       autoAddMusic = false,
+      jobId,
     } = params;
 
     // Dicek lebih dulu supaya tidak mengunduh apa pun bila URL medianya
@@ -424,7 +544,7 @@ export class UrlImportService {
     // Riwayat dibaca sekali di awal, bukan per URL, supaya tidak ada query
     // berulang untuk daftar yang bisa mencapai ratusan.
     const previous = await this.historyRepo.find({
-      where: { replizAccountId, url: In(urls) },
+      where: { replizAccountId, url: In(urls), status: 'scheduled' },
       order: { createdAt: 'DESC' },
     });
     const previousByUrl = new Map<string, UrlImportHistoryEntity>();
@@ -436,6 +556,7 @@ export class UrlImportService {
     // harian berlaku PER AKUN — bukan sekadar per impor.
     const usedPerDay = await this.countScheduledPerDay(replizAccountId);
     let slotIndex = 0;
+    let processed = 0;
 
     for (const url of urls) {
       try {
@@ -506,6 +627,11 @@ export class UrlImportService {
               replizAccountId,
               replizScheduleId: created.scheduleId,
               scheduledAt,
+              jobId: jobId ?? null,
+              status: 'scheduled',
+              postType,
+              mediaCount: publicUrls.length,
+              caption: media.caption || null,
             }),
           )
           .catch(() => undefined);
@@ -526,7 +652,48 @@ export class UrlImportService {
         const message =
           error instanceof Error ? error.message : 'Gagal memproses URL';
         this.logger.error(`Gagal memproses ${url}: ${message}`);
+
+        // Baris gagal ikut dicatat supaya bisa ditinjau dan diulang belakangan.
+        // Tidak menandai URL sebagai duplikat, karena status 'failed'
+        // dikecualikan saat memeriksa riwayat.
+        await this.historyRepo
+          .save(
+            this.historyRepo.create({
+              url,
+              replizAccountId,
+              replizScheduleId: null,
+              scheduledAt: null,
+              jobId: jobId ?? null,
+              status: 'failed',
+              errorMessage: message,
+            }),
+          )
+          .catch(() => undefined);
+
         results.push({ url, ok: false, error: message });
+      }
+
+      processed += 1;
+
+      if (jobId) {
+        // Kemajuan disimpan tiap batch, bukan tiap URL: menulis ribuan kali
+        // membebani basis data tanpa membuat UI terasa lebih responsif.
+        if (processed % BATCH_SIZE === 0 || processed === urls.length) {
+          await this.jobRepo
+            .update(jobId, {
+              processed,
+              success: results.filter((r) => r.ok).length,
+              failed: results.filter((r) => !r.ok).length,
+            })
+            .catch(() => undefined);
+        }
+      }
+
+      // Laju ditahan supaya Repliz tidak dibanjiri. Jeda dilewati pada URL
+      // terakhir agar impor kecil tidak terasa lambat tanpa alasan.
+      if (processed < urls.length) {
+        await this.sleep(REPLIZ_CALL_DELAY_MS);
+        if (processed % BATCH_SIZE === 0) await this.sleep(BATCH_PAUSE_MS);
       }
     }
 

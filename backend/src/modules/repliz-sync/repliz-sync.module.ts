@@ -6,6 +6,7 @@ import { ReplizModule } from '../repliz/repliz.module';
 import { ReplizSyncRuleEntity } from './entities/repliz-sync-rule.entity';
 import { ReplizSyncedPostEntity } from './entities/repliz-synced-post.entity';
 import { UrlImportHistoryEntity } from './entities/url-import-history.entity';
+import { UrlImportJobEntity } from './entities/url-import-job.entity';
 import { ReplizSyncController } from './repliz-sync.controller';
 import { ReplizSyncService } from './repliz-sync.service';
 import { UrlImportService } from './url-import.service';
@@ -18,6 +19,7 @@ import { ReplizSyncCron } from './repliz-sync.cron';
       ReplizSyncRuleEntity,
       ReplizSyncedPostEntity,
       UrlImportHistoryEntity,
+      UrlImportJobEntity,
       AccountEntity,
     ]),
     ReplizModule,

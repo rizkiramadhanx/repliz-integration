@@ -15,6 +15,8 @@ import {
 // permanen, sedangkan impor manual tidak terikat rule mana pun.
 @Entity('url_import_history')
 @Index('IDX_url_import_account_url', ['replizAccountId', 'url'])
+@Index('IDX_url_import_job', ['jobId'])
+@Index('IDX_url_import_created', ['createdAt'])
 export class UrlImportHistoryEntity {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -29,6 +31,30 @@ export class UrlImportHistoryEntity {
 
   @Column({ name: 'repliz_schedule_id', type: 'varchar', nullable: true })
   replizScheduleId: string | null;
+
+  // Baris tanpa jobId berasal dari impor sinkron sebelum fitur batch ada;
+  // dibiarkan nullable supaya riwayat lama tetap terbaca.
+  @Column({ name: 'job_id', type: 'uuid', nullable: true })
+  jobId: string | null;
+
+  // 'scheduled' hanya berarti Repliz menerima jadwalnya. Terbit atau
+  // tidaknya ditentukan Repliz belakangan dan tidak tercermin di sini.
+  @Column({ name: 'status', type: 'varchar', default: 'scheduled' })
+  status: 'scheduled' | 'failed';
+
+  @Column({ name: 'error_message', type: 'text', nullable: true })
+  errorMessage: string | null;
+
+  // Disimpan agar baris gagal bisa diulang tanpa mengunduh ulang media
+  // hanya untuk mengetahui jenis kontennya.
+  @Column({ name: 'post_type', type: 'varchar', nullable: true })
+  postType: string | null;
+
+  @Column({ name: 'media_count', type: 'int', default: 0 })
+  mediaCount: number;
+
+  @Column({ name: 'caption', type: 'text', nullable: true })
+  caption: string | null;
 
   @Column({ name: 'scheduled_at', type: 'timestamptz', nullable: true })
   scheduledAt: Date | null;

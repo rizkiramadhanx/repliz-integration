@@ -1,6 +1,8 @@
 import useGetAllReplizAccount from "@/features/repliz/hooks/useGetAllReplizAccount";
 import useMutateImportUrls, {
-  type typeImportUrlResult,
+  useGetImportJob,
+  useGetImportHistory,
+  useMutateRetryImportJob,
 } from "@/features/url-import/hooks/useMutateImportUrls";
 import dayjs from "@/libs/dayjs";
 import {
@@ -13,6 +15,9 @@ import {
   Group,
   List,
   NumberInput,
+  Loader,
+  Pagination,
+  Progress,
   Select,
   Table,
   Text,
@@ -38,7 +43,7 @@ function accountLabel(account: {
 
 // Selaras dengan MAX_URLS_PER_IMPORT di backend; ditegakkan di kedua sisi
 // supaya pengguna diperingatkan sebelum menunggu lama, bukan setelahnya.
-const MAX_URLS = 100;
+const MAX_URLS = 2000;
 
 export default function PageUrlImport() {
   const navigate = useNavigate();
@@ -59,7 +64,13 @@ export default function PageUrlImport() {
   // platform akun tujuan secara otomatis; begitu pengguna mengubahnya,
   // pilihannya dihormati dan tidak ditimpa lagi.
   const [autoAddMusic, setAutoAddMusic] = useState<boolean | null>(null);
-  const [results, setResults] = useState<typeImportUrlResult[]>([]);
+
+  // Penyaring riwayat, mengikuti pola Konten Tersinkron.
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string | null>(null);
+  const [jobFilter, setJobFilter] = useState<string | undefined>();
+  const [historyPage, setHistoryPage] = useState(1);
 
   const { data: dataReplizAccount } = useGetAllReplizAccount({
     page: 1,
@@ -77,6 +88,26 @@ export default function PageUrlImport() {
   const effectiveAutoAddMusic = autoAddMusic ?? isTiktokTarget;
 
   const { mutate: importUrls, isPending } = useMutateImportUrls();
+  const { mutate: retryJob, isPending: isRetrying } = useMutateRetryImportJob();
+  const { data: dataJob, refetch: refetchJob } = useGetImportJob(1, 5);
+  const jobs = dataJob?.data?.data ?? [];
+  const runningJob = jobs.find((job) => job.status === "running");
+
+  const { data: dataHistory, refetch: refetchHistory } = useGetImportHistory({
+    jobId: jobFilter,
+    status: statusFilter ?? undefined,
+    dateFrom: dateFrom || undefined,
+    dateTo: dateTo || undefined,
+    page: historyPage,
+    limit: 25,
+  });
+  const historyRows = dataHistory?.data?.data ?? [];
+  const historyMeta = dataHistory?.data?.meta;
+
+  const applyFilter = (change: () => void) => {
+    change();
+    setHistoryPage(1);
+  };
 
   const urlCount = urls
     .split(/[\r\n,\s]+/)
@@ -112,19 +143,15 @@ export default function PageUrlImport() {
       },
       {
         onSuccess: (res) => {
-          setResults(res.data.results);
-          const dup = res.data.results.filter((r) => r.duplicate).length;
-          if (dup > 0) {
-            notifications.show({
-              title: "Ada URL duplikat",
-              message: `${dup} URL pernah diimpor ke akun ini sebelumnya dan tetap dijadwalkan ulang.`,
-              color: "orange",
-            });
-          }
+          // Impor berjalan di latar belakang: kemajuannya dipantau lewat
+          // daftar job, bukan dari response ini.
+          setUrls("");
+          void refetchJob();
+          void refetchHistory();
           notifications.show({
-            title: res.data.success === res.data.total ? "Sukses" : "Sebagian gagal",
+            title: "Impor dimulai",
             message: res.message,
-            color: res.data.success === res.data.total ? "green" : "yellow",
+            color: "blue",
           });
         },
         onError: (err: unknown) => {
@@ -189,9 +216,8 @@ export default function PageUrlImport() {
       {urlCount > MAX_URLS && (
         <Alert color="orange" variant="light" mt={12}>
           Terdeteksi <b>{urlCount} URL</b>, melebihi batas {MAX_URLS} per sekali
-          impor. Tiap URL perlu mengunduh media dan memanggil Repliz, jadi
-          batch yang terlalu besar membuat prosesnya sangat lama. Bagi menjadi
-          beberapa batch.
+          impor. Tiap URL mengunduh media ke server, jadi batch yang terlalu
+          besar berisiko memenuhi penyimpanan. Bagi menjadi beberapa batch.
         </Alert>
       )}
 
@@ -249,75 +275,140 @@ export default function PageUrlImport() {
         >
           Jadwalkan {urlCount > 0 ? `${urlCount} konten` : ""}
         </Button>
-        {results.length > 0 && (
-          <Button variant="subtle" onClick={() => setResults([])}>
-            Bersihkan hasil
-          </Button>
-        )}
       </Group>
 
-      {results.length > 0 && (
+      {runningJob && (
+        <Alert color="blue" variant="light" mt={20}>
+          <Group justify="space-between" wrap="wrap" gap={8}>
+            <Box>
+              <Text size="sm" fw={600}>
+                Sedang memproses {runningJob.processed} dari {runningJob.total}{" "}
+                URL
+              </Text>
+              <Text size="xs" c="dimmed">
+                {runningJob.replizAccountName ?? "-"} — berhasil{" "}
+                {runningJob.success}, gagal {runningJob.failed}
+              </Text>
+            </Box>
+            <Loader size="sm" />
+          </Group>
+          <Progress
+            mt={10}
+            value={
+              runningJob.total > 0
+                ? (runningJob.processed / runningJob.total) * 100
+                : 0
+            }
+            animated
+          />
+          <Text size="xs" c="dimmed" mt={6}>
+            Halaman boleh ditutup — proses berjalan di server.
+          </Text>
+        </Alert>
+      )}
+
+      {jobs.length > 0 && (
         <Box mt={24}>
           <Text fw={600} mb={8}>
-            Hasil
+            Batch Impor Terakhir
           </Text>
-          <Table.ScrollContainer minWidth={720}>
+          <Table.ScrollContainer minWidth={680}>
             <Table striped withTableBorder>
               <Table.Thead>
                 <Table.Tr>
-                  <Table.Th>URL</Table.Th>
+                  <Table.Th>Waktu</Table.Th>
+                  <Table.Th>Akun</Table.Th>
+                  <Table.Th>Kemajuan</Table.Th>
                   <Table.Th>Status</Table.Th>
-                  <Table.Th>Dijadwalkan</Table.Th>
-                  <Table.Th>Caption</Table.Th>
+                  <Table.Th>Aksi</Table.Th>
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
-                {results.map((result) => (
-                  <Table.Tr key={result.url}>
+                {jobs.map((job) => (
+                  <Table.Tr key={job.id}>
                     <Table.Td>
-                      <Text size="xs" lineClamp={1}>
-                        {result.url}
+                      <Text size="xs">
+                        {dayjs(job.createdAt).format("DD MMM HH:mm")}
                       </Text>
                     </Table.Td>
                     <Table.Td>
-                      <Group gap={4} wrap="wrap">
-                        <Badge
-                          color={result.ok ? "green" : "red"}
-                          variant="light"
-                        >
-                          {result.ok ? "terjadwal" : "gagal"}
-                        </Badge>
-                        {result.duplicate && (
-                          <Badge color="orange" variant="light">
-                            duplikat
-                          </Badge>
-                        )}
-                      </Group>
-                      {result.duplicate && result.previousScheduledAt && (
-                        <Text size="xs" c="orange">
-                          Pernah diimpor{" "}
-                          {dayjs(result.previousScheduledAt).format(
-                            "DD MMM HH:mm",
-                          )}
-                        </Text>
-                      )}
-                      {result.error && (
-                        <Text size="xs" c="red" lineClamp={2}>
-                          {result.error}
-                        </Text>
-                      )}
+                      <Text size="xs">{job.replizAccountName ?? "-"}</Text>
                     </Table.Td>
                     <Table.Td>
                       <Text size="xs">
-                        {result.scheduledAt
-                          ? dayjs(result.scheduledAt).format("DD MMM HH:mm")
-                          : "-"}
+                        {job.processed}/{job.total}
+                      </Text>
+                      <Text size="xs" c="dimmed">
+                        {job.success} berhasil, {job.failed} gagal
                       </Text>
                     </Table.Td>
                     <Table.Td>
-                      <Text size="xs" lineClamp={2}>
-                        {result.caption || "-"}
-                      </Text>
+                      <Badge
+                        variant="light"
+                        color={
+                          job.status === "done"
+                            ? job.failed > 0
+                              ? "yellow"
+                              : "green"
+                            : job.status === "running"
+                              ? "blue"
+                              : "red"
+                        }
+                      >
+                        {job.status}
+                      </Badge>
+                    </Table.Td>
+                    <Table.Td>
+                      <Group gap={6}>
+                        <Button
+                          size="compact-xs"
+                          variant="subtle"
+                          onClick={() =>
+                            applyFilter(() =>
+                              setJobFilter(
+                                jobFilter === job.id ? undefined : job.id,
+                              ),
+                            )
+                          }
+                        >
+                          {jobFilter === job.id ? "Semua" : "Lihat"}
+                        </Button>
+                        {job.status !== "running" &&
+                          (job.failed > 0 || job.processed < job.total) && (
+                          <Button
+                            size="compact-xs"
+                            variant="light"
+                            color="orange"
+                            loading={isRetrying}
+                            onClick={() =>
+                              retryJob(job.id, {
+                                onSuccess: (res) => {
+                                  void refetchJob();
+                                  notifications.show({
+                                    title: "Mengulang",
+                                    message: res.message,
+                                    color: "blue",
+                                  });
+                                },
+                                onError: (err: unknown) => {
+                                  const axErr = err as {
+                                    response?: { data?: { message?: string } };
+                                  };
+                                  notifications.show({
+                                    title: "Gagal",
+                                    message:
+                                      axErr?.response?.data?.message ??
+                                      "Gagal mengulang",
+                                    color: "red",
+                                  });
+                                },
+                              })
+                            }
+                          >
+                            Ulangi ({job.total - job.success})
+                            </Button>
+                          )}
+                      </Group>
                     </Table.Td>
                   </Table.Tr>
                 ))}
@@ -326,6 +417,145 @@ export default function PageUrlImport() {
           </Table.ScrollContainer>
         </Box>
       )}
+
+      <Box mt={28}>
+        <Text fw={600} mb={8}>
+          Riwayat Impor URL
+          {jobFilter && (
+            <Text span size="sm" c="dimmed" ml={8}>
+              (disaring pada satu batch)
+            </Text>
+          )}
+        </Text>
+
+        <Group gap={10} mb={12} align="flex-end" wrap="wrap">
+          <TextInput
+            label="Dari tanggal"
+            type="date"
+            value={dateFrom}
+            onChange={(e) => {
+              const v = e.currentTarget.value;
+              applyFilter(() => setDateFrom(v));
+            }}
+            w={{ base: "100%", sm: 170 }}
+          />
+          <TextInput
+            label="Sampai tanggal"
+            type="date"
+            value={dateTo}
+            onChange={(e) => {
+              const v = e.currentTarget.value;
+              applyFilter(() => setDateTo(v));
+            }}
+            w={{ base: "100%", sm: 170 }}
+          />
+          <Select
+            label="Status"
+            placeholder="Semua"
+            clearable
+            data={[
+              { value: "scheduled", label: "Terjadwal" },
+              { value: "failed", label: "Gagal" },
+            ]}
+            value={statusFilter}
+            onChange={(v) => applyFilter(() => setStatusFilter(v))}
+            w={{ base: "100%", sm: 150 }}
+          />
+          {(dateFrom || dateTo || statusFilter || jobFilter) && (
+            <Button
+              variant="subtle"
+              size="sm"
+              onClick={() =>
+                applyFilter(() => {
+                  setDateFrom("");
+                  setDateTo("");
+                  setStatusFilter(null);
+                  setJobFilter(undefined);
+                })
+              }
+            >
+              Reset filter
+            </Button>
+          )}
+        </Group>
+
+        <Table.ScrollContainer minWidth={780}>
+          <Table striped withTableBorder>
+            <Table.Thead>
+              <Table.Tr>
+                <Table.Th>URL</Table.Th>
+                <Table.Th>Status</Table.Th>
+                <Table.Th>Tipe</Table.Th>
+                <Table.Th>Dijadwalkan</Table.Th>
+                <Table.Th>Caption</Table.Th>
+              </Table.Tr>
+            </Table.Thead>
+            <Table.Tbody>
+              {historyRows.length === 0 && (
+                <Table.Tr>
+                  <Table.Td colSpan={5}>
+                    <Text size="sm" c="dimmed" ta="center" py={12}>
+                      Belum ada riwayat impor.
+                    </Text>
+                  </Table.Td>
+                </Table.Tr>
+              )}
+              {historyRows.map((row) => (
+                <Table.Tr key={row.id}>
+                  <Table.Td>
+                    <Text size="xs" lineClamp={1}>
+                      {row.url}
+                    </Text>
+                  </Table.Td>
+                  <Table.Td>
+                    <Badge
+                      variant="light"
+                      color={row.status === "scheduled" ? "green" : "red"}
+                    >
+                      {row.status === "scheduled" ? "terjadwal" : "gagal"}
+                    </Badge>
+                    {row.errorMessage && (
+                      <Text size="xs" c="red" lineClamp={2}>
+                        {row.errorMessage}
+                      </Text>
+                    )}
+                  </Table.Td>
+                  <Table.Td>
+                    <Text size="xs">
+                      {row.postType ?? "-"}
+                      {row.mediaCount > 1 ? ` (${row.mediaCount})` : ""}
+                    </Text>
+                  </Table.Td>
+                  <Table.Td>
+                    <Text size="xs">
+                      {row.scheduledAt
+                        ? dayjs(row.scheduledAt).format("DD MMM HH:mm")
+                        : "-"}
+                    </Text>
+                  </Table.Td>
+                  <Table.Td>
+                    <Text size="xs" lineClamp={2}>
+                      {row.caption || "-"}
+                    </Text>
+                  </Table.Td>
+                </Table.Tr>
+              ))}
+            </Table.Tbody>
+          </Table>
+        </Table.ScrollContainer>
+
+        {historyMeta && historyMeta.total_page > 1 && (
+          <Group justify="center" mt={12}>
+            <Pagination
+              value={historyPage}
+              onChange={setHistoryPage}
+              total={historyMeta.total_page}
+              size="sm"
+            />
+          </Group>
+        )}
+      </Box>
+
     </Box>
   );
 }

@@ -28,6 +28,8 @@ import { ReplizService } from '../repliz/repliz.service';
 import { In } from 'typeorm';
 import { ReplizSyncRuleEntity } from './entities/repliz-sync-rule.entity';
 import { ReplizSyncedPostEntity } from './entities/repliz-synced-post.entity';
+import { UrlImportHistoryEntity } from './entities/url-import-history.entity';
+import { UrlImportJobEntity } from './entities/url-import-job.entity';
 import {
   CreateReplizSyncRuleDto,
   UpdateReplizSyncRuleDto,
@@ -45,6 +47,10 @@ export class ReplizSyncController {
     private readonly ruleRepo: Repository<ReplizSyncRuleEntity>,
     @InjectRepository(ReplizSyncedPostEntity)
     private readonly syncedRepo: Repository<ReplizSyncedPostEntity>,
+    @InjectRepository(UrlImportJobEntity)
+    private readonly importJobRepo: Repository<UrlImportJobEntity>,
+    @InjectRepository(UrlImportHistoryEntity)
+    private readonly importHistoryRepo: Repository<UrlImportHistoryEntity>,
   ) {}
 
   @Get('rule')
@@ -248,24 +254,199 @@ export class ReplizSyncController {
     }
 
     try {
-      const results = await this.urlImportService.importUrls({
+      // Nama akun disalin ke job supaya riwayat tetap bermakna bila akunnya
+      // kelak dicabut dari Repliz.
+      const accounts = await this.replizService
+        .listAccounts({ page: 1, limit: 100 })
+        .catch(() => null);
+      const account = accounts?.docs?.find(
+        (item) => item.id === body.replizAccountId,
+      );
+
+      const job = await this.urlImportService.startImportJob({
         urls,
         replizAccountId: body.replizAccountId,
+        replizAccountName: account?.name,
         startDate: body.startDate,
         startTime: body.startTime,
         autoAddMusic: body.autoAddMusic === true,
         intervalMinutes: body.intervalMinutes,
       });
 
-      const ok = results.filter((r) => r.ok).length;
-      res.status(HttpStatus.OK);
+      // 202: pekerjaan diterima tapi belum selesai. Impor ribuan URL bisa
+      // memakan puluhan menit, jauh melewati batas 100 detik Cloudflare.
+      res.status(HttpStatus.ACCEPTED);
       return createSuccessResponse(
-        `${ok} dari ${results.length} URL berhasil dijadwalkan`,
-        { results, total: results.length, success: ok },
+        `${urls.length} URL sedang diproses di latar belakang`,
+        { jobId: job.id, total: job.total },
       );
     } catch (err) {
       const message =
         err instanceof Error ? err.message : 'Gagal mengimpor URL';
+      res.status(HttpStatus.BAD_REQUEST);
+      return createErrorResponse(message, HttpStatus.BAD_REQUEST);
+    }
+  }
+
+  // Daftar batch impor. Dipisah dari riwayat per-URL supaya UI bisa
+  // menampilkan kemajuan job yang sedang berjalan tanpa memuat ribuan baris.
+  @Get('import-job')
+  @Permissions('repliz-sync:read')
+  async listImportJobs(
+    @Res({ passthrough: true }) res: Response,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const currentPage = Math.max(1, Number(page) || 1);
+    const perPage = Math.min(100, Math.max(1, Number(limit) || 10));
+
+    const [jobs, total] = await this.importJobRepo.findAndCount({
+      order: { createdAt: 'DESC' },
+      skip: (currentPage - 1) * perPage,
+      take: perPage,
+    });
+
+    res.status(HttpStatus.OK);
+    return createSuccessResponse('Berhasil mengambil job impor', {
+      data: jobs,
+      meta: {
+        page: currentPage,
+        limit: perPage,
+        total,
+        total_page: Math.ceil(total / perPage),
+      },
+    });
+  }
+
+  // Riwayat impor per URL, dengan penyaring yang sama seperti Konten
+  // Tersinkron: rentang tanggal dan status.
+  @Get('import-history')
+  @Permissions('repliz-sync:read')
+  async listImportHistory(
+    @Res({ passthrough: true }) res: Response,
+    @Query('jobId') jobId?: string,
+    @Query('replizAccountId') replizAccountId?: string,
+    @Query('status') status?: string,
+    @Query('dateFrom') dateFrom?: string,
+    @Query('dateTo') dateTo?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    // Difilter pada created_at (kapan URL diproses), bukan scheduled_at:
+    // scheduled_at kosong untuk baris gagal, sehingga menyaring dengannya
+    // justru menyembunyikan baris yang paling perlu ditinjau.
+    const from = dateFrom ? new Date(`${dateFrom}T00:00:00.000Z`) : null;
+    const to = dateTo ? new Date(`${dateTo}T23:59:59.999Z`) : null;
+
+    if ((from && isNaN(from.getTime())) || (to && isNaN(to.getTime()))) {
+      res.status(HttpStatus.BAD_REQUEST);
+      return createErrorResponse(
+        'Format tanggal tidak valid, gunakan YYYY-MM-DD',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+    if (from && to && from > to) {
+      res.status(HttpStatus.BAD_REQUEST);
+      return createErrorResponse(
+        'dateFrom tidak boleh melewati dateTo',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const where: Record<string, unknown> = {};
+    if (jobId) where.jobId = jobId;
+    if (replizAccountId) where.replizAccountId = replizAccountId;
+    if (status) where.status = status;
+    if (from && to) where.createdAt = Between(from, to);
+    else if (from) where.createdAt = MoreThanOrEqual(from);
+    else if (to) where.createdAt = LessThanOrEqual(to);
+
+    const currentPage = Math.max(1, Number(page) || 1);
+    const perPage = Math.min(200, Math.max(1, Number(limit) || 25));
+
+    const [rows, total] = await this.importHistoryRepo.findAndCount({
+      where,
+      order: { createdAt: 'DESC' },
+      skip: (currentPage - 1) * perPage,
+      take: perPage,
+    });
+
+    res.status(HttpStatus.OK);
+    return createSuccessResponse('Berhasil mengambil riwayat impor', {
+      data: rows,
+      meta: {
+        page: currentPage,
+        limit: perPage,
+        total,
+        total_page: Math.ceil(total / perPage),
+      },
+    });
+  }
+
+  // Mengulang URL yang gagal pada satu job, tanpa menyentuh yang sudah
+  // berhasil — supaya tidak ada jadwal ganda.
+  @Post('import-job/:id/retry')
+  @Permissions('repliz-sync:create')
+  async retryFailedImports(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const job = await this.importJobRepo.findOne({ where: { id } });
+    if (!job) {
+      res.status(HttpStatus.NOT_FOUND);
+      return createErrorResponse('Job tidak ditemukan', HttpStatus.NOT_FOUND);
+    }
+    if (job.status === 'running') {
+      res.status(HttpStatus.BAD_REQUEST);
+      return createErrorResponse(
+        'Job masih berjalan, tunggu sampai selesai',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    // Yang diulang bukan hanya baris berstatus 'failed', tapi juga URL yang
+    // BELUM punya baris sama sekali — kasus server dimulai ulang di tengah
+    // impor, di mana sisa URL tidak pernah sempat dicoba dan karenanya tidak
+    // meninggalkan jejak apa pun.
+    const rows = await this.importHistoryRepo.find({ where: { jobId: id } });
+    const scheduled = new Set(
+      rows.filter((row) => row.status === 'scheduled').map((row) => row.url),
+    );
+    const candidates = job.urls?.length
+      ? job.urls
+      : rows.filter((row) => row.status === 'failed').map((row) => row.url);
+    const urls = Array.from(
+      new Set(candidates.filter((url) => !scheduled.has(url))),
+    );
+
+    if (urls.length === 0) {
+      res.status(HttpStatus.BAD_REQUEST);
+      return createErrorResponse(
+        'Tidak ada URL yang perlu diulang pada job ini',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    try {
+      // Memakai pengaturan penjadwalan job asal supaya pengguna tidak perlu
+      // mengisinya lagi. Tanggal mulai dikosongkan agar slotnya dihitung
+      // ulang dari sekarang, bukan menumpuk di tanggal yang sudah lewat.
+      const retryJob = await this.urlImportService.startImportJob({
+        urls,
+        replizAccountId: job.replizAccountId,
+        replizAccountName: job.replizAccountName ?? undefined,
+        startTime: job.startTime ?? '06:00',
+        intervalMinutes: job.intervalMinutes,
+        autoAddMusic: job.autoAddMusic,
+      });
+
+      res.status(HttpStatus.ACCEPTED);
+      return createSuccessResponse(
+        `${urls.length} URL gagal sedang diulang`,
+        { jobId: retryJob.id, total: retryJob.total },
+      );
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Gagal mengulang';
       res.status(HttpStatus.BAD_REQUEST);
       return createErrorResponse(message, HttpStatus.BAD_REQUEST);
     }
