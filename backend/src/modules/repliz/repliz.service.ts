@@ -182,6 +182,20 @@ export class ReplizService {
     }
   }
 
+  // Repliz MENERIMA `reel` saat jadwal dibuat, tapi gagal saat menerbitkannya
+  // dengan pesan "invalid postId: unsupported type schedule" — jadi kegagalan
+  // baru terlihat setelah jadwalnya jatuh tempo, bukan saat dibuat.
+  //
+  // Dibuktikan dengan mengirim BERKAS VIDEO YANG SAMA ke akun yang sama pada
+  // waktu yang sama, hanya berbeda `type`: `reel` gagal, `video` terbit normal
+  // (postId 18127949080669255). Instagram tetap menampilkan video vertikal
+  // sebagai Reels, sehingga hasil akhirnya tidak berbeda bagi penonton.
+  private publishableType(
+    type: ReplizScheduleType,
+  ): Exclude<ReplizScheduleType, 'reel'> {
+    return type === 'reel' ? 'video' : type;
+  }
+
   async createSchedule(
     params: CreateScheduleParams,
   ): Promise<{ scheduleId: string }> {
@@ -191,7 +205,7 @@ export class ReplizService {
         {
           title: params.title,
           description: params.description,
-          type: params.type,
+          type: this.publishableType(params.type),
           medias: params.medias,
           accountId: params.accountId,
           scheduleAt: params.scheduleAt,
