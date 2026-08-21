@@ -86,6 +86,8 @@ export class UrlImportService {
       ttdl: (url: string) => Promise<Record<string, string>>;
       igdl: (url: string) => Promise<string[]>;
       fbdl: (url: string) => Promise<string[]>;
+      igdl2: (url: string) => Promise<unknown>;
+      fbdl2: (url: string) => Promise<unknown>;
     };
 
     const withTimeout = <T>(promise: Promise<T>): Promise<T> =>
@@ -151,15 +153,34 @@ export class UrlImportService {
       return { mediaUrls: [mediaUrl], caption: data?.title ?? '', isVideo: true };
     }
 
-    const urls = await withRetry(() =>
-      platform === 'instagram' ? scraper.igdl(url) : scraper.fbdl(url),
-    );
-    const mediaUrls = Array.isArray(urls)
-      ? urls.filter(
-          (item) => typeof item === 'string' && /^https?:/i.test(item),
-        )
-      : [];
-    if (mediaUrls.length === 0) throw new Error('URL media tidak ditemukan');
+    // Dua downloader dengan layanan hulu BERBEDA: `igdl`/`fbdl` memakai
+    // videodropper.app, sedangkan `igdl2`/`fbdl2` memakai rapidcdn.app.
+    // Keduanya layanan pihak ketiga gratis yang bisa memblokir IP tertentu —
+    // pernah terjadi videodropper menolak IP VPS ("Premature close") padahal
+    // dari jaringan lain berhasil. Karena itu kegagalan satu jalur harus
+    // dicoba ulang lewat jalur satunya, bukan langsung dianggap gagal.
+    const primary = () =>
+      platform === 'instagram' ? scraper.igdl(url) : scraper.fbdl(url);
+    const secondary = () =>
+      platform === 'instagram' ? scraper.igdl2(url) : scraper.fbdl2(url);
+
+    let mediaUrls: string[] = [];
+    let firstError: unknown;
+    for (const [index, resolver] of [primary, secondary].entries()) {
+      try {
+        mediaUrls = this.extractMediaUrls(await withRetry(resolver));
+        if (mediaUrls.length > 0) break;
+      } catch (error) {
+        if (index === 0) firstError = error;
+      }
+    }
+
+    if (mediaUrls.length === 0) {
+      // Error jalur pertama yang dilaporkan: lebih informatif untuk
+      // membedakan pemblokiran hulu dari postingan privat/terhapus.
+      if (firstError) throw firstError;
+      throw new Error('URL media tidak ditemukan');
+    }
 
     // Tipe ditentukan dari media PERTAMA: satu postingan Instagram tidak
     // mencampur foto dan video dalam satu carousel.
@@ -244,6 +265,36 @@ export class UrlImportService {
       caption: this.normalizeCaption(body.data.title, body.data.content_desc),
       isVideo: true,
     };
+  }
+
+  // Menyeragamkan dua bentuk balasan downloader menjadi daftar URL.
+  // `igdl`/`fbdl` mengembalikan array string, sedangkan `igdl2`/`fbdl2`
+  // mengembalikan { status, data: [{ url, thumbnail }] }. Bidang `thumbnail`
+  // sengaja diabaikan: itu gambar pratinjau, bukan medianya.
+  private extractMediaUrls(raw: unknown): string[] {
+    const isUsable = (item: unknown): item is string =>
+      typeof item === 'string' && /^https?:/i.test(item);
+
+    // Duplikat dibuang sambil mempertahankan urutan: `igdl2` mengembalikan
+    // satu entri per varian kualitas, sehingga carousel 3 foto bisa terbaca
+    // sebagai 9 media dan terkirim sebagai album berisi foto yang sama
+    // berulang tiga kali.
+    const unique = (items: string[]): string[] => [...new Set(items)];
+
+    if (Array.isArray(raw)) return unique(raw.filter(isUsable));
+
+    const data = (raw as { data?: unknown })?.data;
+    if (Array.isArray(data)) {
+      return unique(
+        data
+          .map((item) =>
+            isUsable(item) ? item : (item as { url?: unknown })?.url,
+          )
+          .filter(isUsable),
+      );
+    }
+
+    return [];
   }
 
   private normalizeCaption(
