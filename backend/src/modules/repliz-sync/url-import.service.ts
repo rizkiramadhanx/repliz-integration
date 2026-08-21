@@ -37,7 +37,9 @@ export type ImportUrlsParams = {
 };
 
 type ResolvedMedia = {
-  mediaUrl: string;
+  // Semua media dalam satu postingan. Carousel/slideshow menghasilkan
+  // beberapa berkas; mengambil satu saja membuat sisanya hilang.
+  mediaUrls: string[];
   caption: string;
   isVideo: boolean;
 };
@@ -135,26 +137,37 @@ export class UrlImportService {
       // `video` (H.264) diutamakan daripada `video_hd` yang memakai HEVC —
       // HEVC tidak didukung banyak pemutar dan berisiko ditolak Repliz.
       // `video_wm` tidak dipakai karena memuat watermark.
+      const images = Array.isArray((data as { images?: string[] })?.images)
+        ? ((data as { images?: string[] }).images ?? []).filter(
+            (item) => typeof item === 'string' && /^https?:/i.test(item),
+          )
+        : [];
+      if (images.length > 0) {
+        return { mediaUrls: images, caption: data?.title ?? '', isVideo: false };
+      }
+
       const mediaUrl = data?.video || data?.video_hd;
       if (!mediaUrl) throw new Error('URL video TikTok tidak ditemukan');
-      return { mediaUrl, caption: data?.title ?? '', isVideo: true };
+      return { mediaUrls: [mediaUrl], caption: data?.title ?? '', isVideo: true };
     }
 
     const urls = await withRetry(() =>
       platform === 'instagram' ? scraper.igdl(url) : scraper.fbdl(url),
     );
-    const mediaUrl = Array.isArray(urls)
-      ? urls.find((item) => typeof item === 'string' && /^https?:/i.test(item))
-      : null;
-    if (!mediaUrl) throw new Error('URL media tidak ditemukan');
+    const mediaUrls = Array.isArray(urls)
+      ? urls.filter(
+          (item) => typeof item === 'string' && /^https?:/i.test(item),
+        )
+      : [];
+    if (mediaUrls.length === 0) throw new Error('URL media tidak ditemukan');
+
+    // Tipe ditentukan dari media PERTAMA: satu postingan Instagram tidak
+    // mencampur foto dan video dalam satu carousel.
+    const isVideo = !/\.(jpg|jpeg|png|webp)(\?|$)/i.test(mediaUrls[0]);
 
     // Downloader Instagram/Facebook tidak mengembalikan caption, jadi
     // dibiarkan kosong — pengguna bisa mengisinya sendiri di Repliz.
-    return {
-      mediaUrl,
-      caption: '',
-      isVideo: !/\.(jpg|jpeg|png|webp)(\?|$)/i.test(mediaUrl),
-    };
+    return { mediaUrls, caption: '', isVideo };
   }
 
   // Memanggil API tikwm langsung. Dipisah dari library supaya kegagalannya
@@ -182,11 +195,33 @@ export class UrlImportService {
         hdplay?: string;
         title?: string;
         content_desc?: string | string[];
+        // Slideshow foto TikTok: berisi daftar gambar, dan `play` boleh jadi
+        // hanya video hasil rendering slideshow-nya.
+        images?: string[];
       };
     };
 
     if (body?.code !== 0 || !body?.data) {
       throw new Error(body?.msg || 'tikwm tidak mengembalikan data');
+    }
+
+    // Slideshow foto ditangani lebih dulu: `play` pada konten seperti ini
+    // berisi video hasil rendering, bukan konten aslinya. Mengirim video itu
+    // membuat postingan kehilangan bentuk aslinya sebagai kumpulan foto.
+    const images = Array.isArray(body.data.images)
+      ? body.data.images.filter(
+          (item) => typeof item === 'string' && /^https?:/i.test(item),
+        )
+      : [];
+    if (images.length > 0) {
+      return {
+        mediaUrls: images,
+        caption: this.normalizeCaption(
+          body.data.title,
+          body.data.content_desc,
+        ),
+        isVideo: false,
+      };
     }
 
     // `play` (H.264 tanpa watermark) diutamakan daripada `hdplay` yang
@@ -196,9 +231,11 @@ export class UrlImportService {
     if (!mediaUrl) return null;
 
     return {
-      mediaUrl: mediaUrl.startsWith('http')
-        ? mediaUrl
-        : `https://www.tikwm.com${mediaUrl}`,
+      mediaUrls: [
+        mediaUrl.startsWith('http')
+          ? mediaUrl
+          : `https://www.tikwm.com${mediaUrl}`,
+      ],
       // Sebagian video mengisi `content_desc` tapi tidak `title` (atau
       // sebaliknya), jadi keduanya dipakai bergantian. `content_desc` bisa
       // berupa array (potongan teks) maupun string, jadi bentuknya
@@ -355,13 +392,17 @@ export class UrlImportService {
 
         // URL yang sudah menunjuk direktori media sendiri tidak diunduh
         // ulang agar tidak menggandakan berkas.
-        const publicUrl = media.mediaUrl.includes(
-          `/uploads/${REPLIZ_MEDIA_SUBDIR}/`,
-        )
-          ? media.mediaUrl
-          : buildPublicUrl(
-              (await downloadToPublicDir(media.mediaUrl)).publicPath,
-            );
+        // Semua media diunduh, bukan hanya yang pertama: carousel Instagram
+        // bisa berisi banyak foto, dan mengambil satu saja membuat sisanya
+        // hilang tanpa pemberitahuan.
+        const publicUrls: string[] = [];
+        for (const source of media.mediaUrls) {
+          publicUrls.push(
+            source.includes(`/uploads/${REPLIZ_MEDIA_SUBDIR}/`)
+              ? source
+              : buildPublicUrl((await downloadToPublicDir(source)).publicPath),
+          );
+        }
 
         // Geser slot selama tanggalnya sudah penuh di akun tujuan.
         let scheduledAt = this.scheduleTimeAt(
@@ -386,14 +427,16 @@ export class UrlImportService {
         usedPerDay.set(dateKey, (usedPerDay.get(dateKey) ?? 0) + 1);
         slotIndex += 1;
 
+        // Lebih dari satu media berarti carousel; Repliz menyebutnya `album`.
+        const mediaType = media.isVideo ? 'video' : 'image';
+        const postType = publicUrls.length > 1 ? 'album' : mediaType;
+
         const created = await this.replizService.createSchedule({
           accountId: replizAccountId,
           title: '',
           description: media.caption,
-          type: media.isVideo ? 'video' : 'image',
-          medias: [
-            { url: publicUrl, type: media.isVideo ? 'video' : 'image' },
-          ],
+          type: postType,
+          medias: publicUrls.map((url) => ({ url, type: mediaType })),
           scheduleAt: scheduledAt.toISOString(),
           // Musik hanya relevan untuk video; menyalakannya pada gambar
           // tidak berpengaruh dan berpotensi ditolak platform.
