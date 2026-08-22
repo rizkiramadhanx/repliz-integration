@@ -31,7 +31,17 @@ type AndarazResponse = {
   title?: string;
   download_url?: string;
   results?: AndarazItem[];
-  data?: unknown;
+  // Endpoint Facebook memakai bentuk lain: { data: { title, hd, sd } }.
+  data?:
+    | {
+        title?: string;
+        quoted?: string;
+        hd?: string;
+        sd?: string;
+        result?: AndarazItem[];
+      }
+    | AndarazItem[]
+    | unknown;
 };
 
 export function isAndarazEnabled(): boolean {
@@ -54,17 +64,51 @@ function endpointFor(platform: 'tiktok' | 'instagram' | 'facebook'): string {
 // jadi dibuang. Bentuk dengan teks asli memakai pola `: "..."` di belakang
 // metriknya — bagian dalam kutip itulah captionnya.
 export function cleanCaption(raw?: string): string {
-  const text = (raw ?? '').trim();
+  const text = decodeEntities((raw ?? '').trim());
   if (!text) return '';
 
+  // Instagram dengan teks: `... on August 21, 2026: "isi caption"`.
   const quoted = text.match(/:\s*"([\s\S]*)"\s*\.?\s*$/);
   if (quoted) return quoted[1].trim();
 
+  // Instagram tanpa teks: hanya ringkasan metrik, bukan caption.
   if (/^\d[\d.,]*\s+likes?,\s+[\d.,]+\s+comments?\s+-\s+/i.test(text)) {
     return '';
   }
 
+  // Facebook: "68K views · 3.9K reactions | Isi postingan | Nama Halaman".
+  // Ruas pertama selalu metrik dan ruas terakhir nama pemilik, jadi yang
+  // diambil adalah bagian tengahnya.
+  if (/^[\d.,]+[KMB]?\s+views?\s*·/i.test(text) && text.includes('|')) {
+    const parts = text
+      .split('|')
+      .map((part) => part.trim())
+      .filter(Boolean);
+    if (parts.length >= 2) {
+      const middle = parts.slice(1, parts.length > 2 ? -1 : undefined);
+      return middle.join(' | ').trim();
+    }
+    return '';
+  }
+
   return text;
+}
+
+// Andaraz meneruskan teks Facebook apa adanya dari HTML, sehingga entitas
+// seperti &#xb7; dan &amp; ikut terbawa dan akan terbit mentah.
+function decodeEntities(text: string): string {
+  if (!text.includes('&')) return text;
+  return text
+    .replace(/&#x([0-9a-f]+);/gi, (_, hex) =>
+      String.fromCodePoint(parseInt(hex, 16)),
+    )
+    .replace(/&#(\d+);/g, (_, dec) => String.fromCodePoint(Number(dec)))
+    .replace(/&quot;/g, '"')
+    .replace(/&#0?39;|&apos;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&');
 }
 
 function collectMedia(body: AndarazResponse): AndarazItem[] {
@@ -75,8 +119,31 @@ function collectMedia(body: AndarazResponse): AndarazItem[] {
   if (body.download_url) {
     return [{ url: body.download_url, type: body.type }];
   }
+
   const data = body.data;
   if (Array.isArray(data)) return data as AndarazItem[];
+
+  if (data && typeof data === 'object') {
+    const obj = data as {
+      hd?: string;
+      sd?: string;
+      result?: AndarazItem[];
+    };
+
+    // Facebook: { data: { hd, sd } }. HD didahulukan, SD hanya dipakai bila
+    // HD tidak tersedia — mengirim keduanya akan terbaca sebagai album berisi
+    // video yang sama dua kali.
+    if (typeof obj.hd === 'string' || typeof obj.sd === 'string') {
+      const best = obj.hd || obj.sd;
+      return best ? [{ url: best, type: 'video' }] : [];
+    }
+
+    // Bentuk v2: { data: { result: [{ quality, url }] } }, terurut HD lalu SD.
+    if (Array.isArray(obj.result) && obj.result.length > 0) {
+      return [obj.result[0]];
+    }
+  }
+
   return [];
 }
 
@@ -133,9 +200,15 @@ export async function fetchViaAndaraz(
 
     if (mediaUrls.length === 0) return null;
 
+    const nested = (body.data ?? {}) as { title?: string; quoted?: string };
+
     return {
       mediaUrls: Array.from(new Set(mediaUrls)),
-      caption: cleanCaption(body.caption ?? body.title),
+      // `quoted` (teks postingan) lebih tepat daripada `title` milik Facebook
+      // yang berisi ringkasan metrik ("68K views · 3.9K reactions | ...").
+      caption: cleanCaption(
+        body.caption ?? nested.quoted ?? body.title ?? nested.title,
+      ),
       isVideo: looksLikeVideo(items, body.type),
     };
   } catch (error) {
