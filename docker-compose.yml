@@ -57,6 +57,7 @@ services:
       MAIL_FROM_NAME: ${MAIL_FROM_NAME:-}
       ALERT_TARGET_EMAIL: ${ALERT_TARGET_EMAIL:-}
       REPLIZ_BASE_URL: ${REPLIZ_BASE_URL:-https://api.repliz.com}
+      API_ANDARAZ_TOKEN: ${API_ANDARAZ_TOKEN:-}
       REPLIZ_ACCESS_KEY: ${REPLIZ_ACCESS_KEY:-}
       REPLIZ_SECRET_KEY: ${REPLIZ_SECRET_KEY:-}
       # Dipakai membentuk URL media yang diunduh server Repliz — default ke

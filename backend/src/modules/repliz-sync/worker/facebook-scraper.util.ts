@@ -1,4 +1,5 @@
 import { Page, chromium } from 'playwright';
+import { fetchViaAndaraz } from './andaraz.util';
 import { AccountEntity } from '../../accounts/entities/account.entity';
 import {
   RawSessionCookie,
@@ -266,6 +267,15 @@ async function listRecentPostLinks(
 async function fetchDownloaderVideoUrl(
   postId: string,
 ): Promise<string | null> {
+  // Andaraz dicoba lebih dulu: satu layanan berbayar berkunci API, alih-alih
+  // layanan gratis yang gampang memblokir IP server. Bila gagal, jalur lama
+  // di bawah tetap dipakai.
+  const viaAndaraz = await fetchViaAndaraz(
+    `https://www.facebook.com/reel/${postId}/`,
+    'facebook',
+  );
+  if (viaAndaraz?.mediaUrls.length) return viaAndaraz.mediaUrls[0];
+
   try {
     // require dipakai agar kegagalan memuat modul pihak ketiga tidak
     // menggagalkan seluruh scraper saat paketnya belum terpasang.

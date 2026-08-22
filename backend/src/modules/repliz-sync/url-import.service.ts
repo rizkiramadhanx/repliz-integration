@@ -4,6 +4,7 @@ import { In, Repository } from 'typeorm';
 import { ReplizService } from '../repliz/repliz.service';
 import { UrlImportHistoryEntity } from './entities/url-import-history.entity';
 import { UrlImportJobEntity } from './entities/url-import-job.entity';
+import { fetchViaAndaraz } from './worker/andaraz.util';
 import {
   assertPublicBaseUrlUsable,
   buildPublicUrl,
@@ -241,8 +242,15 @@ export class UrlImportService implements OnModuleInit {
       throw lastError;
     };
 
+    // Andaraz adalah jalur UTAMA untuk ketiga platform: satu layanan berbayar
+    // dengan kunci API, alih-alih rangkaian layanan gratis yang gampang
+    // memblokir IP server. Bila gagal, jalur lama tetap dipakai sebagai
+    // cadangan — tidak ada layanan pihak ketiga yang bisa diandalkan 100%.
+    const viaAndaraz = await fetchViaAndaraz(url, platform);
+    if (viaAndaraz) return viaAndaraz;
+
     if (platform === 'tiktok') {
-      // Panggilan langsung ke API tikwm sebagai jalur utama: `ttdl` membungkus
+      // Panggilan langsung ke API tikwm sebagai cadangan pertama: `ttdl` membungkus
       // API yang sama, tapi kegagalannya sering berupa error internal yang
       // tidak bisa dibedakan dari masalah jaringan. Memanggil langsung membuat
       // status HTTP dan kode respons terbaca, sehingga retry lebih tepat

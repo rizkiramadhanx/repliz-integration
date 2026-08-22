@@ -1,4 +1,5 @@
 import { Page, chromium } from 'playwright';
+import { fetchViaAndaraz } from './andaraz.util';
 import { AccountEntity } from '../../accounts/entities/account.entity';
 import {
   RawSessionCookie,
@@ -237,6 +238,21 @@ async function fetchVideoDetail(
   username: string,
   videoId: string,
 ): Promise<ScrapedTiktokPost | null> {
+  const postUrlForAndaraz = `https://www.tiktok.com/@${username}/video/${videoId}`;
+
+  // Andaraz dicoba lebih dulu; bila gagal, jalur ttdl di bawah tetap dipakai.
+  const viaAndaraz = await fetchViaAndaraz(postUrlForAndaraz, 'tiktok');
+  if (viaAndaraz?.mediaUrls.length) {
+    return {
+      videoId,
+      caption: viaAndaraz.caption,
+      mediaUrl: viaAndaraz.mediaUrls[0],
+      isVideo: viaAndaraz.isVideo,
+      thumbnailUrl: null,
+      postUrl: postUrlForAndaraz,
+    };
+  }
+
   try {
     // require dipakai agar kegagalan memuat modul pihak ketiga tidak
     // menggagalkan seluruh scraper saat paketnya belum terpasang.
