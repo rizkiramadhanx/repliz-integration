@@ -7,6 +7,7 @@ import useMutateImportUrls, {
 import dayjs from "@/libs/dayjs";
 import {
   Alert,
+  Anchor,
   Badge,
   Box,
   Button,
@@ -485,7 +486,7 @@ export default function PageUrlImport() {
               <Table.Tr>
                 <Table.Th>URL</Table.Th>
                 <Table.Th>Status</Table.Th>
-                <Table.Th>Tipe</Table.Th>
+                <Table.Th>Konten</Table.Th>
                 <Table.Th>Dijadwalkan</Table.Th>
                 <Table.Th>Caption</Table.Th>
               </Table.Tr>
@@ -521,10 +522,37 @@ export default function PageUrlImport() {
                     )}
                   </Table.Td>
                   <Table.Td>
-                    <Text size="xs">
+                    <Text size="xs" c="dimmed">
                       {row.postType ?? "-"}
-                      {row.mediaCount > 1 ? ` (${row.mediaCount})` : ""}
+                      {row.mediaCount > 1 ? ` · ${row.mediaCount} media` : ""}
                     </Text>
+                    {row.mediaUrls && row.mediaUrls.length > 0 ? (
+                      <Group gap={4} mt={2} wrap="wrap">
+                        {row.mediaUrls.map((mediaUrl, index) => (
+                          <Anchor
+                            key={mediaUrl}
+                            href={mediaUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            size="xs"
+                          >
+                            {row.postType === "image" ||
+                            row.postType === "album"
+                              ? `foto ${index + 1}`
+                              : `video ${index + 1}`}
+                          </Anchor>
+                        ))}
+                      </Group>
+                    ) : (
+                      row.status === "scheduled" && (
+                        // Baris lama diimpor sebelum tautan media disimpan;
+                        // tidak bisa diisi ulang karena media aslinya sudah
+                        // lama diunduh.
+                        <Text size="xs" c="dimmed">
+                          (tautan tidak tersimpan)
+                        </Text>
+                      )
+                    )}
                   </Table.Td>
                   <Table.Td>
                     <Text size="xs">

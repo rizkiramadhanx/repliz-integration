@@ -53,6 +53,12 @@ export class UrlImportHistoryEntity {
   @Column({ name: 'media_count', type: 'int', default: 0 })
   mediaCount: number;
 
+  // Tautan media yang tersimpan di server kita (bukan URL asal platform,
+  // yang tokennya kedaluwarsa dalam hitungan jam). Inilah yang juga dikirim
+  // ke Repliz, sehingga isi yang dijadwalkan bisa ditinjau ulang dari riwayat.
+  @Column({ name: 'media_urls', type: 'jsonb', nullable: true })
+  mediaUrls: string[] | null;
+
   @Column({ name: 'caption', type: 'text', nullable: true })
   caption: string | null;
 

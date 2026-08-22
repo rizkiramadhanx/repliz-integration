@@ -46,6 +46,7 @@ export type typeImportHistoryRow = {
   errorMessage: string | null;
   postType: string | null;
   mediaCount: number;
+  mediaUrls: string[] | null;
   caption: string | null;
   createdAt: string;
 };

@@ -639,6 +639,7 @@ export class UrlImportService implements OnModuleInit {
               status: 'scheduled',
               postType,
               mediaCount: publicUrls.length,
+              mediaUrls: publicUrls,
               caption: media.caption || null,
             }),
           )
