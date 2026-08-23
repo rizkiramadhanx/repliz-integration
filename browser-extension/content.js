@@ -73,12 +73,39 @@ function extractText(article) {
 // Hanya media milik postingan yang diambil. Avatar dan emoji ikut muncul
 // sebagai <img>, jadi disaring lewat pola URL-nya: t51.2885-19 adalah foto
 // profil Instagram/Threads, dan /emoji/ adalah ikon.
-function isContentImage(src) {
+// Foto profil di Threads/Instagram memakai akhiran "-19" pada segmen jenis
+// berkas (t51.2885-19 DAN t51.82787-19), sedangkan media postingan memakai
+// "-15". Menyaring hanya t51.2885-19 tidak cukup — varian 82787-19 lolos dan
+// avatar ikut terkirim.
+function isProfilePicture(src) {
+  return /t51\.\d+-19\//.test(src);
+}
+
+function isContentImage(src, img) {
   if (!src || !/^https?:/i.test(src)) return false;
-  if (/t51\.2885-19/.test(src)) return false;
+  if (isProfilePicture(src)) return false;
   if (/\/emoji\//.test(src)) return false;
   if (/profile_images/.test(src)) return false;
   if (/\/svg\//.test(src)) return false;
+
+  if (img) {
+    // Avatar selalu kecil dan persegi. Ukuran dipakai sebagai penyaring
+    // kedua karena pola URL bisa berubah sewaktu-waktu, sedangkan bentuk
+    // avatar tidak.
+    const width = img.naturalWidth || img.width || 0;
+    const height = img.naturalHeight || img.height || 0;
+    if (width && height && width <= 160 && height <= 160) return false;
+
+    // Threads/X memberi label pada avatar; teks alt-nya menyebut foto profil.
+    const alt = (img.getAttribute('alt') || '').toLowerCase();
+    if (/profile picture|foto profil|avatar/.test(alt)) return false;
+
+    // Avatar berada di dalam tautan menuju profil, bukan menuju postingan.
+    const link = img.closest('a[href]');
+    const href = link?.getAttribute('href') ?? '';
+    if (href && /^\/@[^/]+\/?$/.test(href)) return false;
+  }
+
   return true;
 }
 
@@ -100,7 +127,7 @@ function extractMedia(article) {
 
   article.querySelectorAll('img').forEach((img) => {
     const src = img.src || '';
-    if (isContentImage(src) && !seen.has(src)) {
+    if (isContentImage(src, img) && !seen.has(src)) {
       seen.add(src);
       media.push({ type: 'image', url: src });
     }
