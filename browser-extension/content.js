@@ -79,13 +79,49 @@ function extractText(article) {
     raw = source.textContent || '';
   }
 
-  return [raw]
+  const lines = [raw]
     .join('\n')
     .split('\n')
     .map((line) => line.trim())
-    .filter(Boolean)
-    .join('\n')
-    .trim();
+    .filter(Boolean);
+
+  return stripAuthorLine(lines, article).join('\n').trim();
+}
+
+// Username penulis muncul sebagai baris pertama caption
+// ("thefoundrlab1If you need proof..."). Ia tidak selalu berada di dalam
+// tautan /@username, jadi menghapus elemennya tidak cukup — pada Threads
+// namanya kerap hanya <span> biasa. Karena itu baris pertama dicocokkan
+// dengan username yang tertera pada tautan profil di postingan ini.
+function stripAuthorLine(lines, article) {
+  if (lines.length === 0) return lines;
+
+  const usernames = new Set();
+  article.querySelectorAll('a[href]').forEach((link) => {
+    const href = link.getAttribute('href') ?? '';
+    const match = href.match(/^(?:https?:\/\/[^/]+)?\/@([^/?#]+)\/?$/);
+    if (match) usernames.add(match[1].toLowerCase());
+  });
+
+  if (usernames.size === 0) return lines;
+
+  const first = lines[0];
+
+  // Baris yang PERSIS username: dibuang seluruhnya.
+  if (usernames.has(first.toLowerCase())) return lines.slice(1);
+
+  // Username menempel di depan kalimat tanpa spasi: hanya awalannya yang
+  // dipotong, sisanya tetap caption. Dicocokkan dari yang terpanjang agar
+  // username yang saling berawalan tidak terpotong sebagian.
+  const sorted = Array.from(usernames).sort((a, b) => b.length - a.length);
+  for (const name of sorted) {
+    if (first.toLowerCase().startsWith(name)) {
+      const rest = first.slice(name.length).trim();
+      return rest ? [rest, ...lines.slice(1)] : lines.slice(1);
+    }
+  }
+
+  return lines;
 }
 
 // Hanya media milik postingan yang diambil. Avatar dan emoji ikut muncul
