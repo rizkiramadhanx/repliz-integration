@@ -15,10 +15,8 @@ const CONFIG = {
   REPLIZ_ACCESS_KEY: 'GANTI_ACCESS_KEY',
   REPLIZ_SECRET_KEY: 'GANTI_SECRET_KEY',
 
-  // Akun Threads tujuan. Isi id-nya dari daftar akun Repliz.
-  TARGET_ACCOUNTS: [
-    { id: '6a85ba7162caae1e04feba27', name: 'Cucicuci | Kasir Laundry' },
-  ],
+  // Akun Threads tujuan diambil otomatis dari Repliz saat tombol dipakai,
+  // jadi tidak perlu didaftarkan di sini.
 
   // Jeda sebelum terbit. Repliz berbasis jadwal, jadi "posting sekarang"
   // diwujudkan sebagai jadwal beberapa menit ke depan — sekaligus menyisakan

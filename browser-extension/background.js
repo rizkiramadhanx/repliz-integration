@@ -111,9 +111,37 @@ async function createSchedule({ accountId, description, medias, publishAt }) {
   return body;
 }
 
+// Daftar akun diambil langsung dari Repliz, bukan dari daftar tetap di
+// config: akun baru yang dihubungkan akan langsung muncul tanpa perlu
+// menyunting berkas apa pun.
+let cachedAccounts = null;
+
+async function listThreadsAccounts() {
+  if (cachedAccounts) return cachedAccounts;
+
+  const response = await fetch(
+    'https://api.repliz.com/public/account?page=1&limit=100',
+    { headers: { Authorization: replizAuthHeader() } },
+  );
+  if (!response.ok) {
+    throw new Error(`Gagal mengambil akun (HTTP ${response.status})`);
+  }
+
+  const body = await response.json();
+  const accounts = (body?.docs ?? [])
+    .filter((item) => item?.type === 'threads')
+    .map((item) => ({
+      id: item._id,
+      name: item.name || `@${item.username ?? ''}`,
+    }));
+
+  cachedAccounts = accounts;
+  return accounts;
+}
+
 async function handleClone(payload) {
-  const account = CONFIG.TARGET_ACCOUNTS[0];
-  if (!account?.id) throw new Error('TARGET_ACCOUNTS belum diisi di config.js');
+  const accountId = payload.accountId;
+  if (!accountId) throw new Error('Akun tujuan belum dipilih');
 
   const medias = [];
   for (const item of payload.media.slice(0, 10)) {
@@ -126,7 +154,7 @@ async function handleClone(payload) {
   ).toISOString();
 
   await createSchedule({
-    accountId: account.id,
+    accountId,
     description: payload.text,
     medias,
     publishAt,
@@ -136,6 +164,15 @@ async function handleClone(payload) {
 }
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (message?.kind === 'accounts') {
+    listThreadsAccounts()
+      .then((accounts) => sendResponse({ ok: true, accounts }))
+      .catch((error) =>
+        sendResponse({ ok: false, error: error?.message ?? String(error) }),
+      );
+    return true;
+  }
+
   if (message?.kind !== 'clone') return false;
 
   handleClone(message.payload)
