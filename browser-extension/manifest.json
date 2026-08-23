@@ -1,14 +1,38 @@
 {
   "manifest_version": 3,
-  "name": "Ternak Sosmed — Pengambil URL Konten",
-  "version": "1.0.0",
-  "description": "Mengambil daftar URL video/post dari halaman profil TikTok, Instagram, dan Facebook untuk disalin ke Sinkronisasi Repliz.",
-  "permissions": ["activeTab", "scripting", "clipboardWrite"],
+  "name": "Ternak Sosmed — Pengambil URL & Clone Konten",
+  "version": "1.1.0",
+  "description": "Mengambil daftar URL konten TikTok/Instagram/Facebook, serta mengkloning postingan Threads/X langsung ke akun Threads di Repliz.",
+  "permissions": ["activeTab", "scripting", "clipboardWrite", "storage"],
   "host_permissions": [
     "https://www.tiktok.com/*",
     "https://www.instagram.com/*",
     "https://www.facebook.com/*",
-    "https://web.facebook.com/*"
+    "https://web.facebook.com/*",
+    "https://www.threads.com/*",
+    "https://www.threads.net/*",
+    "https://x.com/*",
+    "https://twitter.com/*",
+    "https://api.repliz.com/*",
+    "https://api.woipan.tech/*",
+    "https://*.cdninstagram.com/*",
+    "https://*.fbcdn.net/*",
+    "https://*.twimg.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.threads.com/*",
+        "https://www.threads.net/*",
+        "https://x.com/*",
+        "https://twitter.com/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
   ],
   "action": {
     "default_popup": "popup.html",

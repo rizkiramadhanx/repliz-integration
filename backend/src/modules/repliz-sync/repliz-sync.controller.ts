@@ -31,6 +31,11 @@ import { ReplizSyncedPostEntity } from './entities/repliz-synced-post.entity';
 import { UrlImportHistoryEntity } from './entities/url-import-history.entity';
 import { UrlImportJobEntity } from './entities/url-import-job.entity';
 import {
+  assertPublicBaseUrlUsable,
+  buildPublicUrl,
+  saveBufferToPublicDir,
+} from './worker/public-media.util';
+import {
   CreateReplizSyncRuleDto,
   UpdateReplizSyncRuleDto,
   normalizeUsernames,
@@ -290,6 +295,57 @@ export class ReplizSyncController {
 
   // Daftar batch impor. Dipisah dari riwayat per-URL supaya UI bisa
   // menampilkan kemajuan job yang sedang berjalan tanpa memuat ribuan baris.
+  // Menerima media mentah dari extension lalu mengembalikan URL publiknya.
+  // Dibutuhkan karena CDN Threads/Instagram menolak permintaan dari server
+  // luar (HTTP 403), sehingga Repliz tidak bisa mengunduh langsung dari URL
+  // aslinya — browser pengguna yang sudah punya sesi login mengambil bytenya,
+  // lalu menitipkannya ke sini.
+  @Post('media-upload')
+  @Permissions('repliz-sync:create')
+  async uploadMedia(
+    @Body() body: { contentType?: string; dataBase64?: string },
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const contentType = (body?.contentType ?? '').trim();
+    const dataBase64 = body?.dataBase64 ?? '';
+
+    if (!contentType || !dataBase64) {
+      res.status(HttpStatus.BAD_REQUEST);
+      return createErrorResponse(
+        'contentType dan dataBase64 wajib diisi',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    try {
+      // Divalidasi lebih dulu: menyimpan berkas yang URL-nya nanti tidak bisa
+      // dijangkau Repliz hanya menyisakan sampah di disk.
+      assertPublicBaseUrlUsable();
+
+      const buffer = Buffer.from(dataBase64, 'base64');
+      if (buffer.length === 0) {
+        throw new Error('Data media kosong atau bukan base64 yang sah');
+      }
+      // Batas selaras dengan ukuran video pendek; tanpa ini satu unggahan
+      // keliru bisa memenuhi disk VPS.
+      if (buffer.length > 100 * 1024 * 1024) {
+        throw new Error('Media melebihi 100 MB');
+      }
+
+      const saved = saveBufferToPublicDir(buffer, contentType);
+      res.status(HttpStatus.CREATED);
+      return createSuccessResponse('Media tersimpan', {
+        url: buildPublicUrl(saved.publicPath),
+        bytes: buffer.length,
+      });
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : 'Gagal menyimpan media';
+      res.status(HttpStatus.BAD_REQUEST);
+      return createErrorResponse(message, HttpStatus.BAD_REQUEST);
+    }
+  }
+
   @Get('import-job')
   @Permissions('repliz-sync:read')
   async listImportJobs(

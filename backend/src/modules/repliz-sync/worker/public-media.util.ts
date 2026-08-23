@@ -22,6 +22,32 @@ const MIME_EXTENSION: Record<string, string> = {
   'video/quicktime': '.mov',
 };
 
+// Menyimpan berkas yang dikirim langsung (bukan diunduh dari URL). Dipakai
+// extension untuk media Threads/X: CDN-nya menolak permintaan dari server
+// luar (terbukti HTTP 403), jadi browser penggunalah yang mengambil bytenya
+// lalu mengunggahnya ke sini agar punya URL publik yang bisa dibaca Repliz.
+export function saveBufferToPublicDir(
+  buffer: Buffer,
+  contentType: string,
+): DownloadedMedia {
+  fs.mkdirSync(REPLIZ_MEDIA_DIR, { recursive: true });
+
+  const normalized = (contentType ?? '').split(';')[0].trim().toLowerCase();
+  const extension = MIME_EXTENSION[normalized];
+  if (!extension) {
+    throw new Error(`Tipe media tidak didukung: ${normalized || '(kosong)'}`);
+  }
+
+  const filename = `${randomUUID()}${extension}`;
+  const absolutePath = path.join(REPLIZ_MEDIA_DIR, filename);
+  fs.writeFileSync(absolutePath, buffer);
+
+  return {
+    absolutePath,
+    publicPath: `uploads/${REPLIZ_MEDIA_SUBDIR}/${filename}`,
+  };
+}
+
 export type DownloadedMedia = {
   absolutePath: string;
   publicPath: string;

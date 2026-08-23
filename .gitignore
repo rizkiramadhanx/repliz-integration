@@ -1,3 +1,7 @@
 .env
 .DS_Store
 .claude/
+
+# Config extension memuat kunci Repliz dan kata sandi backend secara
+# hardcode — jangan pernah masuk ke repositori. Salin dari config.example.js.
+browser-extension/config.js

@@ -17,6 +17,12 @@ async function bootstrap() {
   // Serve uploaded files (e.g. event image_background, brochure)
   app.use('/uploads', express.static(join(process.cwd(), 'uploads')));
 
+  // Media dari extension dikirim sebagai base64 di dalam JSON, dan base64
+  // membengkakkan ukuran ~33%. Batas bawaan Express (100kb) akan menolak
+  // bahkan satu foto, jadi dinaikkan seukuran video pendek + margin.
+  app.use(express.json({ limit: '150mb' }));
+  app.use(express.urlencoded({ limit: '150mb', extended: true }));
+
   app.useGlobalInterceptors(new ClassSerializerInterceptor(app.get(Reflector)));
 
   app.enableCors({
