@@ -51,15 +51,33 @@ function extractText(article) {
     el.remove(),
   );
 
+  // Tautan menuju halaman profil (/@username) memuat nama akun penulis.
+  // Tanpa dibuang, namanya menempel di awal caption tanpa spasi —
+  // "julietemirellaNever underestimate how quickly...".
+  clone.querySelectorAll('a[href]').forEach((link) => {
+    const href = link.getAttribute('href') ?? '';
+    if (/^\/@[^/]+\/?$/.test(href) || /^https?:\/\/[^/]+\/@[^/]+\/?$/.test(href)) {
+      link.remove();
+    }
+  });
+
   // X menandai isi tweet secara eksplisit; Threads tidak, jadi seluruh teks
   // yang tersisa dipakai.
   const tweetText = clone.querySelector('[data-testid="tweetText"]');
   const source = tweetText ?? clone;
 
   // innerText mengikuti tata letak dan memberi baris baru yang rapi, tapi
-  // nilainya kosong bila elemen tidak sedang dirender. textContent selalu
-  // terisi, jadi dipakai sebagai cadangan.
-  const raw = source.innerText || source.textContent || '';
+  // nilainya kosong bila elemen tidak sedang dirender (mis. di luar layar).
+  // textContent selalu terisi TAPI merapatkan semua teks tanpa pemisah,
+  // sehingga kalimat antar-elemen menyatu ("...digital?Ada saran..."). Karena
+  // itu tiap elemen blok diberi pemisah baris lebih dulu.
+  let raw = source.innerText;
+  if (!raw) {
+    source
+      .querySelectorAll('div,p,span,br,li,h1,h2,h3')
+      .forEach((el) => el.insertAdjacentText('beforebegin', '\n'));
+    raw = source.textContent || '';
+  }
 
   return [raw]
     .join('\n')
@@ -78,7 +96,15 @@ function extractText(article) {
 // "-15". Menyaring hanya t51.2885-19 tidak cukup — varian 82787-19 lolos dan
 // avatar ikut terkirim.
 function isProfilePicture(src) {
-  return /t51\.\d+-19\//.test(src);
+  // Segmen jenis berkas: avatar memakai akhiran -19, media postingan -15.
+  if (/t51\.\d+-19/.test(src)) return true;
+
+  // Penanda paling andal: parameter stp pada URL memuat ukuran hasil olahan,
+  // dan foto profil selalu diminta dalam ukuran kecil persegi (s150x150).
+  // Ini tetap berlaku meski nomor segmen berkasnya berubah.
+  if (/[?&]stp=[^&]*s\d{2,3}x\d{2,3}/.test(src)) return true;
+
+  return false;
 }
 
 function isContentImage(src, img) {
