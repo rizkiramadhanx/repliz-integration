@@ -109,13 +109,39 @@ function isContentImage(src, img) {
   return true;
 }
 
+// Threads dan X memutar video lewat MediaSource, sehingga <video>.src berisi
+// "blob:..." — bukan berkas yang bisa diunduh, dan blob terikat pada dokumen
+// pembuatnya sehingga service worker pun tidak bisa mengambilnya. URL asli
+// biasanya masih tersedia di <source> atau atribut lain, jadi itu yang dicari
+// lebih dulu.
+function findVideoUrl(video) {
+  const candidates = [
+    video.getAttribute('src'),
+    ...Array.from(video.querySelectorAll('source')).map((source) =>
+      source.getAttribute('src'),
+    ),
+    video.getAttribute('data-src'),
+  ];
+
+  for (const candidate of candidates) {
+    if (candidate && /^https?:/i.test(candidate)) return candidate;
+  }
+  return null;
+}
+
 function extractMedia(article) {
   const media = [];
   const seen = new Set();
+  let blockedVideo = false;
 
   article.querySelectorAll('video').forEach((video) => {
-    const src = video.src || video.querySelector('source')?.src || '';
-    if (src && /^https?:/i.test(src) && !seen.has(src)) {
+    const src = findVideoUrl(video);
+    if (!src) {
+      // Ada video tapi URL-nya tidak bisa diambil (blob/MediaSource).
+      blockedVideo = true;
+      return;
+    }
+    if (!seen.has(src)) {
       seen.add(src);
       media.push({ type: 'video', url: src });
     }
@@ -124,6 +150,15 @@ function extractMedia(article) {
   // Video diprioritaskan: bila postingan berisi video, <img> yang ada hanyalah
   // sampulnya dan tidak boleh ikut terkirim sebagai foto terpisah.
   if (media.length > 0) return media;
+
+  // Postingan video yang URL-nya tidak terbaca TIDAK boleh diam-diam jatuh ke
+  // gambar: yang terkirim akan berupa sampulnya saja, dan pengguna mengira
+  // videonya sudah ikut. Lebih baik dilaporkan sebagai gagal.
+  if (blockedVideo) {
+    // Ditandai pada array agar bentuk kembaliannya tetap sama bagi pemanggil.
+    media.blockedVideo = true;
+    return media;
+  }
 
   article.querySelectorAll('img').forEach((img) => {
     const src = img.src || '';
@@ -305,6 +340,12 @@ async function handleClone(button, select, article, platform) {
 
   const text = extractText(article);
   const media = extractMedia(article);
+
+  if (media.blockedVideo) {
+    setButtonState(button, 'Video tidak bisa diambil', true);
+    setTimeout(() => setButtonState(button, 'Clone to Threads', false), 4000);
+    return;
+  }
 
   if (!text && media.length === 0) {
     setButtonState(button, 'Kosong — tidak ada isi', true);
