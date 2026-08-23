@@ -254,7 +254,7 @@ function setButtonState(button, text, disabled) {
 // SEBENARNYA akan dikirim — bukan tampilan aslinya — supaya kesalahan
 // pembacaan DOM (caption terpotong, gambar salah) terlihat sebelum terbit,
 // bukan setelahnya.
-function confirmDialog({ text, media, accountName }) {
+function confirmDialog({ text, media, accountName, replies = [] }) {
   return new Promise((resolve) => {
     const overlay = document.createElement('div');
     overlay.style.cssText = [
@@ -345,6 +345,32 @@ function confirmDialog({ text, media, accountName }) {
       panel.appendChild(strip);
     }
 
+    // Bagian lanjutan ditampilkan agar terlihat berapa sambungan yang ikut
+    // terkirim — thread mengular mudah salah terbaca jumlahnya.
+    if (replies.length > 0) {
+      const repLabel = document.createElement('div');
+      repLabel.style.cssText =
+        'font-size:12px;font-weight:600;margin:14px 0 6px';
+      repLabel.textContent = `Sambungan thread: ${replies.length} bagian`;
+      panel.appendChild(repLabel);
+
+      replies.forEach((part, index) => {
+        const row = document.createElement('div');
+        row.style.cssText = [
+          'font-size:11px',
+          'padding:6px 8px',
+          'margin-bottom:4px',
+          'background:#f1f3f5',
+          'border-radius:6px',
+          'white-space:pre-wrap',
+        ].join(';');
+        const extra =
+          part.media.length > 0 ? ` [${part.media.length} media]` : '';
+        row.textContent = `${index + 2}. ${part.text}${extra}`;
+        panel.appendChild(row);
+      });
+    }
+
     const actions = document.createElement('div');
     actions.style.cssText =
       'display:flex;gap:8px;justify-content:flex-end;margin-top:16px';
@@ -392,6 +418,50 @@ function escapeHtml(value) {
   );
 }
 
+// Mengumpulkan seluruh bagian thread mengular (1/4, 2/4, ...). Di halaman
+// detail Threads, lanjutan penulis muncul sebagai <article> terpisah setelah
+// postingan utama. Hanya bagian milik penulis yang SAMA yang diambil —
+// balasan akun lain adalah komentar, bukan bagian kontennya.
+function collectThreadParts(article, platform) {
+  const author = findAuthorUsername(article);
+  if (!author || platform !== 'threads') return [article];
+
+  const all = Array.from(
+    document.querySelectorAll('article, [data-pressable-container]'),
+  );
+  const start = all.indexOf(article);
+  if (start === -1) return [article];
+
+  const parts = [article];
+  for (let i = start + 1; i < all.length; i += 1) {
+    const next = all[i];
+    // Elemen bersarang dilewati agar satu bagian tidak terhitung dua kali.
+    if (article.contains(next) || next.contains(article)) continue;
+    if (findAuthorUsername(next) !== author) break;
+    parts.push(next);
+  }
+  return parts;
+}
+
+function findAuthorUsername(article) {
+  const link = Array.from(article.querySelectorAll('a[href]')).find((item) => {
+    const href = item.getAttribute('href') ?? '';
+    return /^(?:https?:\/\/[^/]+)?\/@[^/?#]+\/?$/.test(href);
+  });
+  if (!link) return null;
+  const match = (link.getAttribute('href') ?? '').match(/@([^/?#]+)/);
+  return match ? match[1].toLowerCase() : null;
+}
+
+// Penanda urutan ("1/4", "2/4") ikut terbaca sebagai teks dan tidak layak
+// terbit di postingan hasil kloning.
+function stripPartMarker(text) {
+  return text
+    .replace(/(?:^|\s)\d{1,2}\s*\/\s*\d{1,2}\s*$/, '')
+    .replace(/\bTranslate\b\s*$/i, '')
+    .trim();
+}
+
 async function handleClone(button, select, article, platform) {
   const accountId = select.value;
   if (!accountId) {
@@ -400,8 +470,18 @@ async function handleClone(button, select, article, platform) {
     return;
   }
 
-  const text = extractText(article);
-  const media = extractMedia(article);
+  // Thread mengular dikumpulkan jadi beberapa bagian; postingan biasa
+  // menghasilkan satu bagian saja sehingga alurnya tetap sama.
+  const parts = collectThreadParts(article, platform)
+    .map((node) => ({
+      text: stripPartMarker(extractText(node)),
+      media: extractMedia(node),
+    }))
+    .filter((part) => part.text || part.media.length > 0);
+
+  const head = parts[0] ?? { text: '', media: [] };
+  const text = head.text;
+  const media = head.media;
 
   if (media.blockedVideo) {
     setButtonState(button, 'Video tidak bisa diambil', true);
@@ -417,7 +497,12 @@ async function handleClone(button, select, article, platform) {
 
   const accountName =
     select.options[select.selectedIndex]?.textContent ?? accountId;
-  const confirmed = await confirmDialog({ text, media, accountName });
+  const confirmed = await confirmDialog({
+    text,
+    media,
+    accountName,
+    replies: parts.slice(1),
+  });
   if (!confirmed) return;
 
   setButtonState(button, 'Mengirim…', true);
@@ -427,6 +512,9 @@ async function handleClone(button, select, article, platform) {
     payload: {
       text: confirmed.text,
       media,
+      // Bagian lanjutan dikirim sebagai balasan berantai; Repliz menyimpannya
+      // di field `replies` (diverifikasi tersimpan dengan status pending).
+      replies: parts.slice(1),
       accountId,
       sourceUrl: findPostUrl(article),
       platform,

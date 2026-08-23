@@ -81,7 +81,13 @@ function replizAuthHeader() {
   )}`;
 }
 
-async function createSchedule({ accountId, description, medias, publishAt }) {
+async function createSchedule({
+  accountId,
+  description,
+  medias,
+  publishAt,
+  replies = [],
+}) {
   // Repliz menolak `reel` saat menerbitkan meski menerimanya saat dibuat,
   // jadi video selalu dikirim sebagai `video`.
   let type = 'text';
@@ -101,6 +107,9 @@ async function createSchedule({ accountId, description, medias, publishAt }) {
       medias,
       accountId,
       scheduleAt: publishAt,
+      // Sambungan thread mengular. Hanya disertakan bila ada, karena field
+      // kosong tidak perlu dikirim.
+      ...(replies.length > 0 ? { replies } : {}),
     }),
   });
 
@@ -149,6 +158,17 @@ async function handleClone(payload) {
     medias.push({ url, type: item.type });
   }
 
+  // Media tiap sambungan ikut dititipkan ke server, sama seperti bagian utama.
+  const replies = [];
+  for (const part of payload.replies ?? []) {
+    const partMedias = [];
+    for (const item of part.media.slice(0, 10)) {
+      const url = await uploadMedia(item.url);
+      partMedias.push({ url, type: item.type });
+    }
+    replies.push({ description: part.text, medias: partMedias });
+  }
+
   const publishAt = new Date(
     Date.now() + CONFIG.PUBLISH_DELAY_MINUTES * 60 * 1000,
   ).toISOString();
@@ -158,6 +178,7 @@ async function handleClone(payload) {
     description: payload.text,
     medias,
     publishAt,
+    replies,
   });
 
   return publishAt;
