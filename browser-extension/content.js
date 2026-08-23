@@ -354,7 +354,7 @@ function confirmDialog({ text, media, accountName, replies = [] }) {
       repLabel.textContent = `Sambungan thread: ${replies.length} bagian`;
       panel.appendChild(repLabel);
 
-      replies.forEach((part, index) => {
+      replies.forEach((part) => {
         const row = document.createElement('div');
         row.style.cssText = [
           'font-size:11px',
@@ -366,7 +366,7 @@ function confirmDialog({ text, media, accountName, replies = [] }) {
         ].join(';');
         const extra =
           part.media.length > 0 ? ` [${part.media.length} media]` : '';
-        row.textContent = `${index + 2}. ${part.text}${extra}`;
+        row.textContent = `${part.text}${extra}`;
         panel.appendChild(row);
       });
     }
