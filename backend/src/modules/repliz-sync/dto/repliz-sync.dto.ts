@@ -78,12 +78,12 @@ export class CreateReplizSyncRuleDto {
   sourcePlatform?: 'instagram' | 'facebook' | 'tiktok';
 
   @IsOptional()
-  @IsIn(['posts', 'reels', 'stories'])
-  scrapeMode?: 'posts' | 'reels' | 'stories';
+  @IsIn(['posts', 'reels'])
+  scrapeMode?: 'posts' | 'reels';
 
   @IsOptional()
-  @IsIn(['posts', 'reels', 'stories'])
-  postType?: 'posts' | 'reels' | 'stories';
+  @IsIn(['video', 'reels', 'story'])
+  postType?: 'video' | 'reels' | 'story';
 
   @IsOptional()
   @IsIn(['active', 'paused'])
