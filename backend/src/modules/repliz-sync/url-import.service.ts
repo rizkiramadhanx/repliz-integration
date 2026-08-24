@@ -39,6 +39,8 @@ export type ImportUrlsParams = {
   // Minta Repliz menambahkan musik otomatis. Berguna untuk akun TikTok:
   // sebagian platform menekan jangkauan video tanpa trek musik terdaftar.
   autoAddMusic?: boolean;
+  // Tipe posting: 'video' (feed), 'reels', atau 'story' (Instagram Stories)
+  postType?: 'video' | 'reels' | 'story';
 };
 
 type ResolvedMedia = {
@@ -142,6 +144,7 @@ export class UrlImportService implements OnModuleInit {
         startTime: params.startTime ?? '06:00',
         intervalMinutes: params.intervalMinutes ?? 60,
         autoAddMusic: params.autoAddMusic ?? false,
+        postType: params.postType ?? 'video',
         urls: params.urls,
       }),
     );
@@ -534,6 +537,7 @@ export class UrlImportService implements OnModuleInit {
       startTime = '06:00',
       intervalMinutes = 60,
       autoAddMusic = false,
+      postType = 'video',
       jobId,
     } = params;
 
@@ -608,14 +612,18 @@ export class UrlImportService implements OnModuleInit {
         slotIndex += 1;
 
         // Lebih dari satu media berarti carousel; Repliz menyebutnya `album`.
+        // Override dengan postType dari params jika spesifik (mis. 'story').
         const mediaType = media.isVideo ? 'video' : 'image';
-        const postType = publicUrls.length > 1 ? 'album' : mediaType;
+        let scheduleType = publicUrls.length > 1 ? 'album' : mediaType;
+        if (postType && postType !== 'video') {
+          scheduleType = postType;
+        }
 
         const created = await this.replizService.createSchedule({
           accountId: replizAccountId,
           title: '',
           description: media.caption,
-          type: postType,
+          type: scheduleType as any,
           medias: publicUrls.map((url) => ({ url, type: mediaType })),
           scheduleAt: scheduledAt.toISOString(),
           // Musik hanya relevan untuk video; menyalakannya pada gambar
@@ -637,7 +645,7 @@ export class UrlImportService implements OnModuleInit {
               scheduledAt,
               jobId: jobId ?? null,
               status: 'scheduled',
-              postType,
+              postType: scheduleType,
               mediaCount: publicUrls.length,
               mediaUrls: publicUrls,
               caption: media.caption || null,

@@ -228,6 +228,7 @@ export class ReplizSyncController {
       startTime?: string;
       intervalMinutes?: number;
       autoAddMusic?: boolean;
+      postType?: 'video' | 'reels' | 'story';
     },
     @Res({ passthrough: true }) res: Response,
   ) {
@@ -276,6 +277,7 @@ export class ReplizSyncController {
         startTime: body.startTime,
         autoAddMusic: body.autoAddMusic === true,
         intervalMinutes: body.intervalMinutes,
+        postType: body.postType,
       });
 
       // 202: pekerjaan diterima tapi belum selesai. Impor ribuan URL bisa

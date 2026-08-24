@@ -54,6 +54,9 @@ export class UrlImportJobEntity {
   @Column({ name: 'auto_add_music', type: 'boolean', default: false })
   autoAddMusic: boolean;
 
+  @Column({ name: 'post_type', type: 'varchar', default: 'video', nullable: true })
+  postType?: 'video' | 'reels' | 'story' | null;
+
   @Column({ name: 'message', type: 'text', nullable: true })
   message: string | null;
 
