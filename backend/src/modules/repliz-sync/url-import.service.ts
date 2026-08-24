@@ -41,6 +41,9 @@ export type ImportUrlsParams = {
   autoAddMusic?: boolean;
   // Tipe posting: 'video' (feed), 'reels', atau 'story' (Instagram Stories)
   postType?: 'video' | 'reels' | 'story';
+  // Timezone offset dari browser user (menit, negatif untuk barat UTC)
+  // Contoh: Indonesia (UTC+7) = -420, UTC = 0
+  timezoneOffsetMinutes?: number;
 };
 
 type ResolvedMedia = {
@@ -538,6 +541,7 @@ export class UrlImportService implements OnModuleInit {
       intervalMinutes = 60,
       autoAddMusic = false,
       postType = 'video',
+      timezoneOffsetMinutes = 0,
       jobId,
     } = params;
 
