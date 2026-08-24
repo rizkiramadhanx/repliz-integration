@@ -65,6 +65,7 @@ export default function PageUrlImport() {
   // platform akun tujuan secara otomatis; begitu pengguna mengubahnya,
   // pilihannya dihormati dan tidak ditimpa lagi.
   const [autoAddMusic, setAutoAddMusic] = useState<boolean | null>(null);
+  const [postType, setPostType] = useState<"video" | "reels" | "story">("video");
 
   // Penyaring riwayat, mengikuti pola Konten Tersinkron.
   const [dateFrom, setDateFrom] = useState("");
@@ -141,6 +142,7 @@ export default function PageUrlImport() {
         startTime,
         intervalMinutes: Number(intervalMinutes) || 60,
         autoAddMusic: effectiveAutoAddMusic,
+        postType,
       },
       {
         onSuccess: (res) => {
@@ -234,6 +236,18 @@ export default function PageUrlImport() {
           onChange={setReplizAccountId}
           searchable
           required
+        />
+        <Select
+          label="Tipe posting"
+          placeholder="Pilih tipe"
+          data={[
+            { value: "video", label: "Feed (Video)" },
+            { value: "reels", label: "Reels" },
+            { value: "story", label: "Story (Instagram)" },
+          ]}
+          value={postType}
+          onChange={(val) => setPostType(val as "video" | "reels" | "story")}
+          description="Khusus Instagram: pilih Story untuk posting ke Stories"
         />
         <TextInput
           label="Tanggal mulai"
