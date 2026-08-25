@@ -57,6 +57,12 @@ export class UrlImportJobEntity {
   @Column({ name: 'post_type', type: 'varchar', default: 'video', nullable: true })
   postType?: 'video' | 'reels' | 'story' | null;
 
+  // Offset zona waktu pengguna saat job dibuat (konvensi
+  // Date.getTimezoneOffset(): WIB = -420). Disimpan agar "Ulangi gagal"
+  // menjadwalkan pada jam yang sama seperti impor aslinya.
+  @Column({ name: 'timezone_offset_minutes', type: 'int', default: 0 })
+  timezoneOffsetMinutes: number;
+
   @Column({ name: 'message', type: 'text', nullable: true })
   message: string | null;
 

@@ -20,6 +20,7 @@ export type typeImportUrlsPayload = {
   autoAddMusic?: boolean;
   intervalMinutes?: number;
   postType?: "video" | "reels" | "story";
+  timezoneOffsetMinutes?: number;
 };
 
 export type typeImportJob = {

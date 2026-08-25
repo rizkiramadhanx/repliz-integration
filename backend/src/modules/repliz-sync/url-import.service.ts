@@ -148,6 +148,7 @@ export class UrlImportService implements OnModuleInit {
         intervalMinutes: params.intervalMinutes ?? 60,
         autoAddMusic: params.autoAddMusic ?? false,
         postType: params.postType ?? 'video',
+        timezoneOffsetMinutes: params.timezoneOffsetMinutes ?? 0,
         urls: params.urls,
       }),
     );
@@ -493,14 +494,25 @@ export class UrlImportService implements OnModuleInit {
     return `${year}-${month}-${day}`;
   }
 
+  // `timezoneOffsetMinutes` memakai konvensi Date.getTimezoneOffset() dari
+  // browser: MENIT YANG HARUS DITAMBAHKAN ke waktu lokal untuk memperoleh UTC.
+  // WIB (UTC+7) mengirim -420.
+  //
+  // Jam dibangun lewat Date.UTC + offset, bukan setHours(): setHours()
+  // menafsirkan angkanya sebagai waktu lokal PROSES SERVER, sehingga "13:45"
+  // dari pengguna di Jakarta menjadi 13:45 UTC (20:45 WIB) saat server berjalan
+  // di UTC — jadwal meleset 7 jam tanpa ada yang salah di sisi pengguna.
   private scheduleTimeAt(
     startTime: string,
     intervalMinutes: number,
     slotIndex: number,
     startDate?: string,
+    timezoneOffsetMinutes = 0,
   ): Date {
     const [hour, minute] = startTime.split(':').map((v) => Number(v));
     const intervalMs = intervalMinutes * 60 * 1000;
+    const dayMs = 24 * 60 * 60 * 1000;
+    const offsetMs = timezoneOffsetMinutes * 60 * 1000;
 
     const startMinuteOfDay = (hour || 0) * 60 + (minute || 0);
     const slotsBeforeMidnight = Math.max(
@@ -512,24 +524,33 @@ export class UrlImportService implements OnModuleInit {
     const dayOffset = Math.floor(slotIndex / slotsPerDay);
     const slotInDay = slotIndex % slotsPerDay;
 
-    const start = new Date();
+    // Tanggal acuan juga dihitung di zona waktu pengguna: mendekati tengah
+    // malam, "hari ini" bagi pengguna dan bagi server bisa berbeda tanggal.
+    let year: number;
+    let month: number;
+    let day: number;
 
-    // Tanggal mulai eksplisit dipakai apa adanya; tanpa itu dipakai hari ini.
-    // Dibangun lewat setFullYear agar tetap waktu LOKAL — `new Date('YYYY-MM-DD')`
-    // diperlakukan sebagai UTC dan bisa meleset satu hari.
     if (startDate && /^\d{4}-\d{2}-\d{2}$/.test(startDate)) {
-      const [year, month, day] = startDate.split('-').map((v) => Number(v));
-      start.setFullYear(year, month - 1, day);
+      [year, month, day] = startDate.split('-').map((v) => Number(v));
+    } else {
+      const nowLocal = new Date(Date.now() - offsetMs);
+      year = nowLocal.getUTCFullYear();
+      month = nowLocal.getUTCMonth() + 1;
+      day = nowLocal.getUTCDate();
     }
-    start.setHours(hour || 0, minute || 0, 0, 0);
+
+    // Date.UTC menyusun jam sebagai waktu pengguna, lalu + offset mengubahnya
+    // menjadi UTC sungguhan — hasilnya sama berapa pun timezone server.
+    const startMs =
+      Date.UTC(year, month - 1, day, hour || 0, minute || 0, 0, 0) + offsetMs;
 
     // Hanya digeser ke besok bila tanggalnya TIDAK ditentukan pengguna:
-    // kalau pengguna memilih tanggal, keinginannya harus dihormati apa adanya.
-    const baseDayOffset =
-      !startDate && start.getTime() <= Date.now() ? 1 : 0;
-    start.setDate(start.getDate() + baseDayOffset + dayOffset);
+    // kalau pengguna memilih tanggal, keinginannya dihormati apa adanya.
+    const baseDayOffset = !startDate && startMs <= Date.now() ? 1 : 0;
 
-    return new Date(start.getTime() + slotInDay * intervalMs);
+    return new Date(
+      startMs + (baseDayOffset + dayOffset) * dayMs + slotInDay * intervalMs,
+    );
   }
 
   async importUrls(params: ImportUrlsParams): Promise<ImportUrlResult[]> {
@@ -598,6 +619,7 @@ export class UrlImportService implements OnModuleInit {
           intervalMinutes,
           slotIndex,
           startDate,
+          timezoneOffsetMinutes,
         );
         while (
           (usedPerDay.get(this.dateKey(scheduledAt)) ?? 0) >= MAX_SLOTS_PER_DAY
@@ -608,6 +630,7 @@ export class UrlImportService implements OnModuleInit {
             intervalMinutes,
             slotIndex,
             startDate,
+            timezoneOffsetMinutes,
           );
         }
 

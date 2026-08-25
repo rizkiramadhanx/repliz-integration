@@ -231,6 +231,7 @@ export class ReplizSyncController {
       intervalMinutes?: number;
       autoAddMusic?: boolean;
       postType?: 'video' | 'reels' | 'story';
+      timezoneOffsetMinutes?: number;
     },
     @Res({ passthrough: true }) res: Response,
   ) {
@@ -280,6 +281,13 @@ export class ReplizSyncController {
         autoAddMusic: body.autoAddMusic === true,
         intervalMinutes: body.intervalMinutes,
         postType: body.postType,
+        // Dibatasi ke rentang offset zona waktu yang nyata (UTC-14..UTC+14)
+        // supaya nilai ngawur dari klien tidak menggeser jadwal berhari-hari.
+        timezoneOffsetMinutes:
+          typeof body.timezoneOffsetMinutes === 'number' &&
+          Math.abs(body.timezoneOffsetMinutes) <= 840
+            ? body.timezoneOffsetMinutes
+            : 0,
       });
 
       // 202: pekerjaan diterima tapi belum selesai. Impor ribuan URL bisa
@@ -530,6 +538,10 @@ export class ReplizSyncController {
         startTime: job.startTime ?? '06:00',
         intervalMinutes: job.intervalMinutes,
         autoAddMusic: job.autoAddMusic,
+        // Tipe posting dan zona waktu ikut diwarisi: tanpa ini pengulangan
+        // Story jatuh kembali ke feed, dan jamnya bergeser ke zona server.
+        postType: job.postType ?? undefined,
+        timezoneOffsetMinutes: job.timezoneOffsetMinutes ?? 0,
       });
 
       res.status(HttpStatus.ACCEPTED);

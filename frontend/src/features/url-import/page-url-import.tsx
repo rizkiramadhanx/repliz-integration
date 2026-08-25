@@ -150,6 +150,10 @@ export default function PageUrlImport() {
         intervalMinutes: Number(intervalMinutes) || 60,
         autoAddMusic: effectiveAutoAddMusic,
         postType,
+        // Jam yang diketik pengguna adalah jam DI TEMPATNYA. Tanpa offset ini
+        // server menafsirkannya sebagai waktu lokalnya sendiri, sehingga
+        // jadwal meleset sebesar selisih zona waktu (WIB vs UTC = 7 jam).
+        timezoneOffsetMinutes: new Date().getTimezoneOffset(),
       },
       {
         onSuccess: (res) => {
