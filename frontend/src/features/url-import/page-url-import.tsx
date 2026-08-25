@@ -3,6 +3,8 @@ import useMutateImportUrls, {
   useGetImportJob,
   useGetImportHistory,
   useMutateRetryImportJob,
+  useGetMediaCleanupPreview,
+  useMutateMediaCleanup,
 } from "@/features/url-import/hooks/useMutateImportUrls";
 import dayjs from "@/libs/dayjs";
 import {
@@ -91,6 +93,11 @@ export default function PageUrlImport() {
 
   const { mutate: importUrls, isPending } = useMutateImportUrls();
   const { mutate: retryJob, isPending: isRetrying } = useMutateRetryImportJob();
+  const { data: dataCleanup, refetch: refetchCleanup } =
+    useGetMediaCleanupPreview();
+  const { mutate: cleanupMedia, isPending: isCleaning } =
+    useMutateMediaCleanup();
+  const cleanup = dataCleanup?.data;
   const { data: dataJob, refetch: refetchJob } = useGetImportJob(1, 5);
   const jobs = dataJob?.data?.data ?? [];
   const runningJob = jobs.find((job) => job.status === "running");
@@ -169,6 +176,46 @@ export default function PageUrlImport() {
     );
   };
 
+  const formatBytes = (bytes: number) => {
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+    if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+    return `${(bytes / 1024 / 1024 / 1024).toFixed(2)} GB`;
+  };
+
+  // Penghapusan berkas tidak bisa dibatalkan, jadi jumlahnya dikonfirmasi
+  // lebih dulu. Jadwal di Repliz tidak ikut terhapus — hanya berkas di server.
+  const handleCleanup = () => {
+    if (!cleanup || cleanup.staleFiles === 0) return;
+    const confirmed = window.confirm(
+      `Hapus ${cleanup.staleFiles} berkas media (${formatBytes(
+        cleanup.staleBytes,
+      )}) dari disk server?\n\n` +
+        `${cleanup.keptInUse} berkas yang masih dipakai jadwal mendatang tetap disimpan.\n` +
+        `Jadwal di Repliz TIDAK ikut terhapus.\n\nTindakan ini tidak bisa dibatalkan.`,
+    );
+    if (!confirmed) return;
+
+    cleanupMedia(undefined, {
+      onSuccess: (res) => {
+        void refetchCleanup();
+        notifications.show({
+          title: "Pembersihan selesai",
+          message: res.message,
+          color: "green",
+        });
+      },
+      onError: (err: unknown) => {
+        const axErr = err as { response?: { data?: { message?: string } } };
+        notifications.show({
+          title: "Gagal",
+          message:
+            axErr?.response?.data?.message ?? "Gagal membersihkan media server",
+          color: "red",
+        });
+      },
+    });
+  };
+
   return (
     <Box px={20} py={10}>
       <Group mb="md">
@@ -202,6 +249,49 @@ export default function PageUrlImport() {
           <List.Item>Klik ikon extension → Ambil URL → Salin</List.Item>
         </List>
       </Alert>
+
+      {cleanup && (
+        <Alert
+          color={cleanup.staleFiles > 0 ? "orange" : "gray"}
+          variant="light"
+          mb={16}
+          title="Penyimpanan media di server"
+        >
+          <Group justify="space-between" align="center" wrap="nowrap">
+            <Box>
+              <Text size="sm">
+                Total <b>{cleanup.totalFiles} berkas</b> (
+                {formatBytes(cleanup.totalBytes)}) tersimpan di disk server.
+              </Text>
+              <Text size="sm" c="dimmed">
+                {cleanup.staleFiles > 0 ? (
+                  <>
+                    <b>{cleanup.staleFiles} berkas</b> (
+                    {formatBytes(cleanup.staleBytes)}) sudah lewat masa pakai
+                    dan bisa dihapus. {cleanup.keptInUse} berkas lain masih
+                    dipakai jadwal mendatang — tidak akan disentuh.
+                  </>
+                ) : (
+                  <>
+                    Tidak ada berkas yang perlu dibersihkan. Semua{" "}
+                    {cleanup.keptInUse} berkas masih dipakai jadwal mendatang.
+                  </>
+                )}
+              </Text>
+            </Box>
+            <Button
+              color="red"
+              variant="light"
+              onClick={handleCleanup}
+              loading={isCleaning}
+              disabled={cleanup.staleFiles === 0}
+              style={{ flexShrink: 0 }}
+            >
+              Hapus media lewat masa
+            </Button>
+          </Group>
+        </Alert>
+      )}
 
       <Textarea
         label={`URL konten (${urlCount} terdeteksi)`}

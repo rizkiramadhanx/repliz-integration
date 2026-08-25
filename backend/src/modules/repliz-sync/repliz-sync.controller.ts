@@ -24,6 +24,7 @@ import {
 } from '../../common/type/response';
 import { ReplizSyncService } from './repliz-sync.service';
 import { UrlImportService } from './url-import.service';
+import { MediaCleanupService } from './media-cleanup.service';
 import { ReplizService } from '../repliz/repliz.service';
 import { In } from 'typeorm';
 import { ReplizSyncRuleEntity } from './entities/repliz-sync-rule.entity';
@@ -47,6 +48,7 @@ export class ReplizSyncController {
   constructor(
     private readonly syncService: ReplizSyncService,
     private readonly urlImportService: UrlImportService,
+    private readonly mediaCleanupService: MediaCleanupService,
     private readonly replizService: ReplizService,
     @InjectRepository(ReplizSyncRuleEntity)
     private readonly ruleRepo: Repository<ReplizSyncRuleEntity>,
@@ -343,6 +345,38 @@ export class ReplizSyncController {
     } catch (err) {
       const message =
         err instanceof Error ? err.message : 'Gagal menyimpan media';
+      res.status(HttpStatus.BAD_REQUEST);
+      return createErrorResponse(message, HttpStatus.BAD_REQUEST);
+    }
+  }
+
+  // Ringkasan berkas media di disk server: berapa yang bisa dibersihkan dan
+  // berapa yang masih dipakai jadwal mendatang. Dipisah dari aksi hapusnya
+  // supaya UI bisa menampilkan angkanya sebelum pengguna memutuskan.
+  @Get('media-cleanup')
+  @Permissions('repliz-sync:read')
+  async previewMediaCleanup(@Res({ passthrough: true }) res: Response) {
+    const preview = await this.mediaCleanupService.preview();
+    res.status(HttpStatus.OK);
+    return createSuccessResponse('Ringkasan media di server', preview);
+  }
+
+  // Menghapus berkas media yang sudah lewat masa pakainya dari disk server.
+  // Jadwal di Repliz TIDAK disentuh — hanya berkas di disk yang dibuang.
+  @Delete('media-cleanup')
+  @Permissions('repliz-sync:delete')
+  async runMediaCleanup(@Res({ passthrough: true }) res: Response) {
+    try {
+      const result = await this.mediaCleanupService.cleanup();
+      const megabytes = (result.bytesFreed / 1024 / 1024).toFixed(1);
+      res.status(HttpStatus.OK);
+      return createSuccessResponse(
+        `${result.deleted} berkas dihapus, ${megabytes} MB dibebaskan`,
+        result,
+      );
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : 'Gagal membersihkan media';
       res.status(HttpStatus.BAD_REQUEST);
       return createErrorResponse(message, HttpStatus.BAD_REQUEST);
     }

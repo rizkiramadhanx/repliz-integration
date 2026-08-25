@@ -10,6 +10,7 @@ import { UrlImportJobEntity } from './entities/url-import-job.entity';
 import { ReplizSyncController } from './repliz-sync.controller';
 import { ReplizSyncService } from './repliz-sync.service';
 import { UrlImportService } from './url-import.service';
+import { MediaCleanupService } from './media-cleanup.service';
 import { ReplizSyncCron } from './repliz-sync.cron';
 
 @Module({
@@ -25,7 +26,13 @@ import { ReplizSyncCron } from './repliz-sync.cron';
     ReplizModule,
   ],
   controllers: [ReplizSyncController],
-  providers: [ReplizSyncService, UrlImportService, ReplizSyncCron],
+  providers: [
+    
+    ReplizSyncService,
+    UrlImportService,
+    MediaCleanupService,
+    ReplizSyncCron,
+  ],
   exports: [ReplizSyncService],
 })
 export class ReplizSyncModule {}

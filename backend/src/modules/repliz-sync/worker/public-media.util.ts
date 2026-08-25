@@ -175,3 +175,75 @@ export async function downloadToPublicDir(
     publicPath: `uploads/${REPLIZ_MEDIA_SUBDIR}/${filename}`,
   };
 }
+
+export type MediaFileInfo = {
+  filename: string;
+  absolutePath: string;
+  bytes: number;
+  modifiedAt: Date;
+};
+
+// Mendaftar seluruh berkas media yang tersimpan di disk. Dipakai pembersihan
+// untuk mencari berkas yatim — yang tidak lagi dirujuk jadwal mana pun.
+// Direktori yang belum ada bukan error: berarti belum pernah ada impor.
+export function listMediaFiles(): MediaFileInfo[] {
+  if (!fs.existsSync(REPLIZ_MEDIA_DIR)) return [];
+
+  return fs
+    .readdirSync(REPLIZ_MEDIA_DIR, { withFileTypes: true })
+    .filter((entry) => entry.isFile())
+    .map((entry) => {
+      const absolutePath = path.join(REPLIZ_MEDIA_DIR, entry.name);
+      const stat = fs.statSync(absolutePath);
+      return {
+        filename: entry.name,
+        absolutePath,
+        bytes: stat.size,
+        modifiedAt: stat.mtime,
+      };
+    });
+}
+
+// Menghapus berkas dan melaporkan byte yang benar-benar terbebaskan. Berkas
+// yang gagal dihapus dilewati, bukan menggagalkan seluruh pembersihan:
+// satu berkas terkunci tidak boleh menyisakan ratusan lainnya.
+export function deleteMediaFiles(filenames: string[]): {
+  deleted: number;
+  bytesFreed: number;
+  failed: string[];
+} {
+  let deleted = 0;
+  let bytesFreed = 0;
+  const failed: string[] = [];
+
+  for (const filename of filenames) {
+    // Nama berkas dari luar tidak boleh keluar dari direktori media —
+    // tanpa ini "../../.env" akan terhapus.
+    const absolutePath = path.join(REPLIZ_MEDIA_DIR, path.basename(filename));
+    if (path.dirname(absolutePath) !== REPLIZ_MEDIA_DIR) {
+      failed.push(filename);
+      continue;
+    }
+
+    try {
+      const stat = fs.statSync(absolutePath);
+      fs.unlinkSync(absolutePath);
+      deleted += 1;
+      bytesFreed += stat.size;
+    } catch {
+      failed.push(filename);
+    }
+  }
+
+  return { deleted, bytesFreed, failed };
+}
+
+// Mengambil nama berkas dari URL publik ("https://api.x/uploads/repliz-media/uuid.mp4"
+// → "uuid.mp4"). URL yang bukan milik direktori media menghasilkan null,
+// sehingga media pihak ketiga tidak pernah ikut terhitung.
+export function mediaFilenameFromUrl(url: string): string | null {
+  if (!url || !url.includes(`/uploads/${REPLIZ_MEDIA_SUBDIR}/`)) return null;
+  const withoutQuery = url.split('?')[0];
+  const filename = withoutQuery.split('/').pop();
+  return filename ? filename : null;
+}

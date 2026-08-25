@@ -139,3 +139,43 @@ export function useMutateRetryImportJob() {
     },
   });
 }
+
+export type typeMediaCleanupPreview = {
+  totalFiles: number;
+  totalBytes: number;
+  staleFiles: number;
+  staleBytes: number;
+  keptInUse: number;
+  cutoff: string;
+  files: { filename: string; bytes: number; modifiedAt: string }[];
+};
+
+export function useGetMediaCleanupPreview() {
+  return useQuery({
+    queryKey: ["media-cleanup-preview"],
+    queryFn: async () => {
+      const response = await axiosInstanceAPI.request<{
+        data: typeMediaCleanupPreview;
+      }>({
+        method: "GET",
+        url: "/api/repliz-sync/media-cleanup",
+      });
+      return response.data;
+    },
+  });
+}
+
+export function useMutateMediaCleanup() {
+  return useMutation({
+    mutationFn: async () => {
+      const response = await axiosInstanceAPI.request<{
+        message: string;
+        data: { deleted: number; bytesFreed: number; failed: string[] };
+      }>({
+        method: "DELETE",
+        url: "/api/repliz-sync/media-cleanup",
+      });
+      return response.data;
+    },
+  });
+}
