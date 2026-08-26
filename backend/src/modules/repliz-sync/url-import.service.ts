@@ -22,9 +22,10 @@ export type ImportUrlResult = {
   scheduledAt?: string;
   caption?: string;
   error?: string;
-  // URL ini pernah diimpor ke akun yang sama sebelumnya. Sekadar penanda —
-  // kontennya tetap diproses, karena mengulang bisa saja disengaja.
+  // URL ini pernah diimpor ke akun yang sama sebelumnya, jadi dilewati:
+  // tidak diunduh dan tidak dijadwalkan ulang.
   duplicate?: boolean;
+  skipped?: boolean;
   previousScheduledAt?: string;
 };
 
@@ -191,7 +192,10 @@ export class UrlImportService implements OnModuleInit {
     try {
       const results = await this.importUrls({ ...params, jobId });
       const failed = results.filter((r) => !r.ok).length;
-      const succeeded = results.length - failed;
+      // Yang dilewati tidak dihitung berhasil: tidak ada jadwal baru dibuat
+      // untuknya, jadi menyebutnya "berhasil" menyesatkan.
+      const skipped = results.filter((r) => r.skipped).length;
+      const succeeded = results.length - failed - skipped;
 
       // Dibaca SEBELUM registry dibersihkan di finally: job yang dihentikan
       // di tengah jalan tidak boleh dilaporkan 'done', karena sebagian URL
@@ -205,11 +209,15 @@ export class UrlImportService implements OnModuleInit {
         success: succeeded,
         failed,
         finishedAt: new Date(),
-        message: wasCanceled
-          ? `Dihentikan: ${succeeded} berhasil, ${failed} gagal, ${remaining} belum diproses`
-          : failed > 0
-            ? `${succeeded} berhasil, ${failed} gagal`
-            : `${results.length} berhasil`,
+        message: (() => {
+          const bagian = [`${succeeded} berhasil`];
+          if (failed > 0) bagian.push(`${failed} gagal`);
+          if (skipped > 0)
+            bagian.push(`${skipped} dilewati (sudah pernah diimpor)`);
+          if (wasCanceled) bagian.push(`${remaining} belum diproses`);
+          const ringkasan = bagian.join(', ');
+          return wasCanceled ? `Dihentikan: ${ringkasan}` : ringkasan;
+        })(),
       });
     } catch (error) {
       // Kegagalan di sini berarti seluruh job berhenti (mis. konfigurasi
@@ -638,6 +646,23 @@ export class UrlImportService implements OnModuleInit {
         break;
       }
 
+      // URL yang sudah pernah dijadwalkan ke akun ini dilewati sebelum media
+      // diunduh: mengunduh lalu membuang hasilnya memboroskan puluhan detik
+      // dan ruang disk VPS. Slot juga tidak dipakai, sehingga URL berikutnya
+      // maju mengisi jam yang seharusnya.
+      const before = previousByUrl.get(url);
+      if (before) {
+        results.push({
+          url,
+          ok: true,
+          skipped: true,
+          duplicate: true,
+          previousScheduledAt: before.scheduledAt?.toISOString(),
+        });
+        processed += 1;
+        continue;
+      }
+
       try {
         const media = await this.resolveMedia(url);
 
@@ -726,15 +751,12 @@ export class UrlImportService implements OnModuleInit {
           )
           .catch(() => undefined);
 
-        const before = previousByUrl.get(url);
         results.push({
           url,
           ok: true,
           scheduleId: created.scheduleId,
           scheduledAt: scheduledAt.toISOString(),
           caption: media.caption,
-          duplicate: Boolean(before),
-          previousScheduledAt: before?.scheduledAt?.toISOString(),
         });
       } catch (error) {
         // Satu URL gagal tidak menghentikan sisanya; hasilnya dilaporkan
@@ -772,7 +794,7 @@ export class UrlImportService implements OnModuleInit {
           await this.jobRepo
             .update(jobId, {
               processed,
-              success: results.filter((r) => r.ok).length,
+              success: results.filter((r) => r.ok && !r.skipped).length,
               failed: results.filter((r) => !r.ok).length,
             })
             .catch(() => undefined);

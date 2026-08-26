@@ -451,6 +451,18 @@ export default function PageUrlImport() {
               <Text size="xs" c="dimmed">
                 {runningJob.replizAccountName ?? "-"} — berhasil{" "}
                 {runningJob.success}, gagal {runningJob.failed}
+                {/* Sisanya adalah URL yang dilewati karena sudah pernah
+                    diimpor ke akun ini; tanpa ditampilkan, angka berhasil +
+                    gagal terlihat tidak menjumlah ke jumlah yang diproses. */}
+                {runningJob.processed -
+                  runningJob.success -
+                  runningJob.failed >
+                  0 &&
+                  `, dilewati ${
+                    runningJob.processed -
+                    runningJob.success -
+                    runningJob.failed
+                  }`}
               </Text>
             </Box>
             <Group gap={8} wrap="nowrap">
