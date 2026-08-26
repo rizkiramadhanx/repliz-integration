@@ -554,16 +554,6 @@ export class UrlImportService implements OnModuleInit {
     const dayMs = 24 * 60 * 60 * 1000;
     const offsetMs = timezoneOffsetMinutes * 60 * 1000;
 
-    const startMinuteOfDay = (hour || 0) * 60 + (minute || 0);
-    const slotsBeforeMidnight = Math.max(
-      1,
-      Math.ceil((24 * 60 - startMinuteOfDay) / intervalMinutes),
-    );
-    const slotsPerDay = Math.min(MAX_SLOTS_PER_DAY, slotsBeforeMidnight);
-
-    const dayOffset = Math.floor(slotIndex / slotsPerDay);
-    const slotInDay = slotIndex % slotsPerDay;
-
     // Tanggal acuan juga dihitung di zona waktu pengguna: mendekati tengah
     // malam, "hari ini" bagi pengguna dan bagi server bisa berbeda tanggal.
     let year: number;
@@ -588,9 +578,12 @@ export class UrlImportService implements OnModuleInit {
     // kalau pengguna memilih tanggal, keinginannya dihormati apa adanya.
     const baseDayOffset = !startDate && startMs <= Date.now() ? 1 : 0;
 
-    return new Date(
-      startMs + (baseDayOffset + dayOffset) * dayMs + slotInDay * intervalMs,
-    );
+    // Jadwal mengalir lurus dari jam mulai: 21:00 dengan jeda 1 jam menjadi
+    // 22:00, 23:00, 00:00, 01:00 — tengah malam TIDAK memutus rangkaian.
+    // Sebelumnya slot dipotong di tengah malam, sehingga jam mulai yang larut
+    // hanya kebagian sedikit slot per hari (mulai 21:30 cuma 3) dan sisanya
+    // ditunda ke besok.
+    return new Date(startMs + baseDayOffset * dayMs + slotIndex * intervalMs);
   }
 
   async importUrls(params: ImportUrlsParams): Promise<ImportUrlResult[]> {
