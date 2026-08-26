@@ -11,7 +11,7 @@ export class AddPostTypeToUrlImportJob1724521200000
         type: 'varchar',
         isNullable: true,
         default: "'video'",
-        comment: "Post type: 'video' (feed), 'reels', atau 'story' (Instagram Stories)",
+        comment: "Post type: 'video' (feed), 'reel', atau 'story' (Instagram Stories)",
       }),
     );
   }

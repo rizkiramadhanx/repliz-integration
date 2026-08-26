@@ -19,7 +19,7 @@ export type typeImportUrlsPayload = {
   startTime?: string;
   autoAddMusic?: boolean;
   intervalMinutes?: number;
-  postType?: "video" | "reels" | "story";
+  postType?: "video" | "reel" | "story";
   timezoneOffsetMinutes?: number;
 };
 
@@ -175,6 +175,21 @@ export function useMutateMediaCleanup() {
       }>({
         method: "DELETE",
         url: "/api/repliz-sync/media-cleanup",
+      });
+      return response.data;
+    },
+  });
+}
+
+export function useMutateCancelImportJob() {
+  return useMutation({
+    mutationFn: async (jobId: string) => {
+      const response = await axiosInstanceAPI.request<{
+        message: string;
+        data: { jobId: string };
+      }>({
+        method: "POST",
+        url: `/api/repliz-sync/import-job/${jobId}/cancel`,
       });
       return response.data;
     },

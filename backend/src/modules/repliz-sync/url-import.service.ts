@@ -1,7 +1,10 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
-import { ReplizService } from '../repliz/repliz.service';
+import {
+  ReplizService,
+  type ReplizScheduleType,
+} from '../repliz/repliz.service';
 import { UrlImportHistoryEntity } from './entities/url-import-history.entity';
 import { UrlImportJobEntity } from './entities/url-import-job.entity';
 import { fetchViaAndaraz } from './worker/andaraz.util';
@@ -39,8 +42,10 @@ export type ImportUrlsParams = {
   // Minta Repliz menambahkan musik otomatis. Berguna untuk akun TikTok:
   // sebagian platform menekan jangkauan video tanpa trek musik terdaftar.
   autoAddMusic?: boolean;
-  // Tipe posting: 'video' (feed), 'reels', atau 'story' (Instagram Stories)
-  postType?: 'video' | 'reels' | 'story';
+  // Tipe posting yang dikirim ke Repliz. Nilainya harus sama persis dengan
+  // yang diterima Repliz: `reel` (TUNGGAL, bukan `reels`) — nilai lain
+  // ditolak dengan 400 "each value in type must be one of...".
+  postType?: 'video' | 'reel' | 'story';
   // Timezone offset dari browser user (menit, negatif untuk barat UTC)
   // Contoh: Indonesia (UTC+7) = -420, UTC = 0
   timezoneOffsetMinutes?: number;
@@ -78,6 +83,11 @@ const BATCH_PAUSE_MS = 2000;
 export class UrlImportService implements OnModuleInit {
   private readonly logger = new Logger(UrlImportService.name);
 
+  // Job yang diminta berhenti. Disimpan di memori proses, sama seperti job
+  // itu sendiri: pembatalan hanya bermakna bagi proses yang sedang
+  // menjalankannya. Restart server sudah menghentikan job dengan sendirinya.
+  private readonly cancelRequested = new Set<string>();
+
   constructor(
     private readonly replizService: ReplizService,
     @InjectRepository(UrlImportHistoryEntity)
@@ -109,6 +119,23 @@ export class UrlImportService implements OnModuleInit {
     this.logger.warn(
       `${stale.length} job impor ditandai gagal karena server dimulai ulang`,
     );
+  }
+
+  // Menandai job agar berhenti pada URL berikutnya. URL yang SEDANG diproses
+  // tetap diselesaikan: memutus di tengah unduhan menyisakan berkas separuh
+  // di disk, dan memutus setelah POST terkirim membuat jadwal ada di Repliz
+  // tanpa tercatat di riwayat.
+  async requestCancel(jobId: string): Promise<boolean> {
+    const job = await this.jobRepo.findOne({ where: { id: jobId } });
+    if (!job || job.status !== 'running') return false;
+
+    this.cancelRequested.add(jobId);
+    this.logger.log(`Job impor ${jobId} diminta berhenti`);
+    return true;
+  }
+
+  private isCancelRequested(jobId?: string): boolean {
+    return jobId ? this.cancelRequested.has(jobId) : false;
   }
 
   private sleep(ms: number): Promise<void> {
@@ -164,15 +191,24 @@ export class UrlImportService implements OnModuleInit {
     try {
       const results = await this.importUrls({ ...params, jobId });
       const failed = results.filter((r) => !r.ok).length;
+      const succeeded = results.length - failed;
+
+      // Dibaca SEBELUM registry dibersihkan di finally: job yang dihentikan
+      // di tengah jalan tidak boleh dilaporkan 'done', karena sebagian URL
+      // memang belum sempat diproses.
+      const wasCanceled = this.isCancelRequested(jobId);
+      const remaining = params.urls.length - results.length;
+
       await this.jobRepo.update(jobId, {
-        status: 'done',
+        status: wasCanceled ? 'canceled' : 'done',
         processed: results.length,
-        success: results.length - failed,
+        success: succeeded,
         failed,
         finishedAt: new Date(),
-        message:
-          failed > 0
-            ? `${results.length - failed} berhasil, ${failed} gagal`
+        message: wasCanceled
+          ? `Dihentikan: ${succeeded} berhasil, ${failed} gagal, ${remaining} belum diproses`
+          : failed > 0
+            ? `${succeeded} berhasil, ${failed} gagal`
             : `${results.length} berhasil`,
       });
     } catch (error) {
@@ -188,6 +224,10 @@ export class UrlImportService implements OnModuleInit {
           finishedAt: new Date(),
         })
         .catch(() => undefined);
+    } finally {
+      // Tanpa ini, id job menumpuk di memori selamanya — dan job baru yang
+      // kebetulan memakai id sama akan langsung dianggap dibatalkan.
+      this.cancelRequested.delete(jobId);
     }
   }
 
@@ -596,6 +636,15 @@ export class UrlImportService implements OnModuleInit {
     let processed = 0;
 
     for (const url of urls) {
+      // Diperiksa sebelum pekerjaan berat dimulai, bukan sesudah: unduhan
+      // media bisa memakan puluhan detik per URL.
+      if (this.isCancelRequested(jobId)) {
+        this.logger.log(
+          `Job impor ${jobId} dihentikan setelah ${processed} dari ${urls.length} URL`,
+        );
+        break;
+      }
+
       try {
         const media = await this.resolveMedia(url);
 
@@ -639,18 +688,22 @@ export class UrlImportService implements OnModuleInit {
         slotIndex += 1;
 
         // Lebih dari satu media berarti carousel; Repliz menyebutnya `album`.
-        // Override dengan postType dari params jika spesifik (mis. 'story').
+        // Album tidak boleh ditimpa: memaksa beberapa media menjadi `story`
+        // atau `reel` membuat sisanya hilang, karena kedua tipe itu hanya
+        // menerima satu media.
         const mediaType = media.isVideo ? 'video' : 'image';
-        let scheduleType = publicUrls.length > 1 ? 'album' : mediaType;
-        if (postType && postType !== 'video') {
-          scheduleType = postType;
-        }
+        const isCarousel = publicUrls.length > 1;
+        const scheduleType: ReplizScheduleType = isCarousel
+          ? 'album'
+          : postType && postType !== 'video'
+            ? postType
+            : mediaType;
 
         const created = await this.replizService.createSchedule({
           accountId: replizAccountId,
           title: '',
           description: media.caption,
-          type: scheduleType as any,
+          type: scheduleType,
           medias: publicUrls.map((url) => ({ url, type: mediaType })),
           scheduleAt: scheduledAt.toISOString(),
           // Musik hanya relevan untuk video; menyalakannya pada gambar

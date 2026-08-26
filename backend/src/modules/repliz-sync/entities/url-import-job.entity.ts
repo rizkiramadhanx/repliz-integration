@@ -55,7 +55,7 @@ export class UrlImportJobEntity {
   autoAddMusic: boolean;
 
   @Column({ name: 'post_type', type: 'varchar', default: 'video', nullable: true })
-  postType?: 'video' | 'reels' | 'story' | null;
+  postType?: 'video' | 'reel' | 'story' | null;
 
   // Offset zona waktu pengguna saat job dibuat (konvensi
   // Date.getTimezoneOffset(): WIB = -420). Disimpan agar "Ulangi gagal"

@@ -5,6 +5,7 @@ import useMutateImportUrls, {
   useMutateRetryImportJob,
   useGetMediaCleanupPreview,
   useMutateMediaCleanup,
+  useMutateCancelImportJob,
 } from "@/features/url-import/hooks/useMutateImportUrls";
 import dayjs from "@/libs/dayjs";
 import {
@@ -67,7 +68,7 @@ export default function PageUrlImport() {
   // platform akun tujuan secara otomatis; begitu pengguna mengubahnya,
   // pilihannya dihormati dan tidak ditimpa lagi.
   const [autoAddMusic, setAutoAddMusic] = useState<boolean | null>(null);
-  const [postType, setPostType] = useState<"video" | "reels" | "story">("video");
+  const [postType, setPostType] = useState<"video" | "reel" | "story">("video");
 
   // Penyaring riwayat, mengikuti pola Konten Tersinkron.
   const [dateFrom, setDateFrom] = useState("");
@@ -97,6 +98,8 @@ export default function PageUrlImport() {
     useGetMediaCleanupPreview();
   const { mutate: cleanupMedia, isPending: isCleaning } =
     useMutateMediaCleanup();
+  const { mutate: cancelJob, isPending: isCanceling } =
+    useMutateCancelImportJob();
   const cleanup = dataCleanup?.data;
   const { data: dataJob, refetch: refetchJob } = useGetImportJob(1, 5);
   const jobs = dataJob?.data?.data ?? [];
@@ -178,6 +181,42 @@ export default function PageUrlImport() {
         },
       },
     );
+  };
+
+  // URL yang sudah terjadwal tetap ada di Repliz — yang dibatalkan hanya
+  // sisa URL yang belum diproses. Ditegaskan di konfirmasi supaya tidak
+  // dikira membatalkan seluruh impor.
+  const handleCancelJob = () => {
+    if (!runningJob) return;
+    const remaining = runningJob.total - runningJob.processed;
+    const confirmed = window.confirm(
+      `Hentikan impor yang sedang berjalan?\n\n` +
+        `${runningJob.processed} dari ${runningJob.total} URL sudah diproses ` +
+        `(${runningJob.success} berhasil, ${runningJob.failed} gagal).\n` +
+        `${remaining} URL sisanya tidak akan diproses.\n\n` +
+        `Jadwal yang SUDAH dibuat tetap ada di Repliz.`,
+    );
+    if (!confirmed) return;
+
+    cancelJob(runningJob.id, {
+      onSuccess: (res) => {
+        void refetchJob();
+        notifications.show({
+          title: "Menghentikan impor",
+          message: res.message,
+          color: "orange",
+        });
+      },
+      onError: (err: unknown) => {
+        const axErr = err as { response?: { data?: { message?: string } } };
+        notifications.show({
+          title: "Gagal",
+          message:
+            axErr?.response?.data?.message ?? "Gagal menghentikan job impor",
+          color: "red",
+        });
+      },
+    });
   };
 
   const formatBytes = (bytes: number) => {
@@ -336,11 +375,11 @@ export default function PageUrlImport() {
           placeholder="Pilih tipe"
           data={[
             { value: "video", label: "Feed (Video)" },
-            { value: "reels", label: "Reels" },
+            { value: "reel", label: "Reels" },
             { value: "story", label: "Story (Instagram)" },
           ]}
           value={postType}
-          onChange={(val) => setPostType(val as "video" | "reels" | "story")}
+          onChange={(val) => setPostType(val as "video" | "reel" | "story")}
           description="Khusus Instagram: pilih Story untuk posting ke Stories"
         />
         <TextInput
@@ -399,7 +438,18 @@ export default function PageUrlImport() {
                 {runningJob.success}, gagal {runningJob.failed}
               </Text>
             </Box>
-            <Loader size="sm" />
+            <Group gap={8} wrap="nowrap">
+              <Loader size="sm" />
+              <Button
+                color="red"
+                variant="light"
+                size="xs"
+                onClick={handleCancelJob}
+                loading={isCanceling}
+              >
+                Hentikan
+              </Button>
+            </Group>
           </Group>
           <Progress
             mt={10}

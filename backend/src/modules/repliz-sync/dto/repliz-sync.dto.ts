@@ -82,8 +82,8 @@ export class CreateReplizSyncRuleDto {
   scrapeMode?: 'posts' | 'reels';
 
   @IsOptional()
-  @IsIn(['video', 'reels', 'story'])
-  postType?: 'video' | 'reels' | 'story';
+  @IsIn(['video', 'reel', 'story'])
+  postType?: 'video' | 'reel' | 'story';
 
   @IsOptional()
   @IsIn(['active', 'paused'])

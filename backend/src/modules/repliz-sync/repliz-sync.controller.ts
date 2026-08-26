@@ -230,7 +230,7 @@ export class ReplizSyncController {
       startTime?: string;
       intervalMinutes?: number;
       autoAddMusic?: boolean;
-      postType?: 'video' | 'reels' | 'story';
+      postType?: 'video' | 'reel' | 'story';
       timezoneOffsetMinutes?: number;
     },
     @Res({ passthrough: true }) res: Response,
@@ -361,6 +361,30 @@ export class ReplizSyncController {
   // Ringkasan berkas media di disk server: berapa yang bisa dibersihkan dan
   // berapa yang masih dipakai jadwal mendatang. Dipisah dari aksi hapusnya
   // supaya UI bisa menampilkan angkanya sebelum pengguna memutuskan.
+  // Menghentikan job impor yang sedang berjalan. URL yang sudah dijadwalkan
+  // TETAP ada di Repliz — yang dibatalkan hanya sisa URL yang belum diproses.
+  @Post('import-job/:id/cancel')
+  @Permissions('repliz-sync:create')
+  async cancelImportJob(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const stopped = await this.urlImportService.requestCancel(id);
+    if (!stopped) {
+      res.status(HttpStatus.CONFLICT);
+      return createErrorResponse(
+        'Job tidak ditemukan atau sudah tidak berjalan',
+        HttpStatus.CONFLICT,
+      );
+    }
+
+    res.status(HttpStatus.ACCEPTED);
+    return createSuccessResponse(
+      'Job akan berhenti setelah URL yang sedang diproses selesai',
+      { jobId: id },
+    );
+  }
+
   @Get('media-cleanup')
   @Permissions('repliz-sync:read')
   async previewMediaCleanup(@Res({ passthrough: true }) res: Response) {
