@@ -13,6 +13,13 @@ export default registerAs(
     entities: [__dirname + '/../../modules/**/entities/*.entity.{js,ts}'],
     synchronize: false,
     autoLoadEntities: true,
+    // Migration dijalankan otomatis saat aplikasi start, sehingga `git pull`
+    // + restart container sudah cukup — tanpa langkah manual yang gampang
+    // terlewat dan menyisakan kolom hilang di produksi (yang sempat terjadi
+    // pada post_type). synchronize tetap false: perubahan skema hanya boleh
+    // lewat migration yang tercatat, bukan ditebak dari entity.
+    migrations: [__dirname + '/../migration/*.{js,ts}'],
+    migrationsRun: true,
     // SSL untuk koneksi DB dipisah dari NODE_ENV secara sengaja — Postgres
     // self-hosted (container polos di docker-compose.yml) tidak setup SSL,
     // beda dari DB cloud terkelola (RDS/Supabase/dst) yang biasanya wajib
