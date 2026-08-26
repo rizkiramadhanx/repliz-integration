@@ -98,6 +98,7 @@ async function collectUrls(limit) {
 const statusEl = document.getElementById('status');
 const outEl = document.getElementById('out');
 const copyBtn = document.getElementById('copy');
+const saveBtn = document.getElementById('save');
 
 function setStatus(text, kind) {
   statusEl.textContent = text;
@@ -125,6 +126,7 @@ stopBtn.addEventListener('click', async () => {
 grabBtn.addEventListener('click', async () => {
   setStatus('Mengambil… halaman digulir otomatis. Tekan Berhenti kapan saja.');
   copyBtn.disabled = true;
+  saveBtn.disabled = true;
   grabBtn.disabled = true;
   stopBtn.disabled = false;
   outEl.value = '';
@@ -165,6 +167,7 @@ grabBtn.addEventListener('click', async () => {
 
     outEl.value = urls.join('\n');
     copyBtn.disabled = false;
+    saveBtn.disabled = false;
     // Dibedakan supaya jelas apakah angkanya dibatasi oleh permintaan atau
     // memang segitu yang tersedia — tanpa ini, hasil 25 dari 500 postingan
     // terbaca seolah profilnya cuma punya 25.
@@ -196,3 +199,135 @@ copyBtn.addEventListener('click', async () => {
     setStatus('Tekan Cmd/Ctrl+C untuk menyalin.', 'ok');
   }
 });
+
+// ── Daftar tersimpan ──────────────────────────────────────────────────────
+// Hasil ambil URL disimpan di chrome.storage.local, bukan dikirim ke server:
+// isinya hanya daftar tautan publik dan gunanya sebagai catatan pribadi di
+// perangkat ini. Konsekuensinya tidak ikut berpindah antar browser/komputer.
+
+const STORAGE_KEY = 'savedUrlBatches';
+// Batas jumlah catatan. chrome.storage.local memang lapang, tetapi daftar
+// yang terlalu panjang membuat popup sulit dibaca dan tidak ada gunanya.
+const MAX_SAVED = 50;
+
+const savedListEl = document.getElementById('savedList');
+
+async function readSaved() {
+  const data = await chrome.storage.local.get(STORAGE_KEY);
+  const list = data?.[STORAGE_KEY];
+  return Array.isArray(list) ? list : [];
+}
+
+async function writeSaved(list) {
+  await chrome.storage.local.set({ [STORAGE_KEY]: list.slice(0, MAX_SAVED) });
+}
+
+function formatDate(iso) {
+  const dt = new Date(iso);
+  if (Number.isNaN(dt.getTime())) return '-';
+  return dt.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
+}
+
+async function renderSaved() {
+  const list = await readSaved();
+  savedListEl.textContent = '';
+
+  if (list.length === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'saved-empty';
+    empty.textContent = 'Belum ada hasil tersimpan.';
+    savedListEl.appendChild(empty);
+    return;
+  }
+
+  for (const item of list) {
+    const row = document.createElement('div');
+    row.className = 'saved-item';
+
+    const name = document.createElement('span');
+    name.className = 'saved-name';
+    name.textContent = item.name;
+    const meta = document.createElement('span');
+    meta.className = 'saved-meta';
+    meta.textContent = ` ${item.urls.length} URL · ${formatDate(item.savedAt)}`;
+    name.appendChild(meta);
+    row.appendChild(name);
+
+    // Memuat ke kotak hasil, bukan langsung menyalin: pengguna sering ingin
+    // melihat isinya dulu sebelum menempel ke dashboard.
+    const loadBtn = document.createElement('button');
+    loadBtn.textContent = 'Muat';
+    loadBtn.addEventListener('click', () => {
+      outEl.value = item.urls.join('\n');
+      copyBtn.disabled = false;
+      saveBtn.disabled = false;
+      setStatus(`${item.urls.length} URL dimuat dari "${item.name}".`, 'ok');
+    });
+    row.appendChild(loadBtn);
+
+    const renameBtn = document.createElement('button');
+    renameBtn.textContent = 'Ubah';
+    renameBtn.addEventListener('click', async () => {
+      const next = window.prompt('Nama baru:', item.name);
+      if (next === null) return;
+      const trimmed = next.trim();
+      if (!trimmed) return;
+      const current = await readSaved();
+      const found = current.find((row2) => row2.id === item.id);
+      if (found) found.name = trimmed;
+      await writeSaved(current);
+      await renderSaved();
+      setStatus('Nama diperbarui.', 'ok');
+    });
+    row.appendChild(renameBtn);
+
+    const delBtn = document.createElement('button');
+    delBtn.className = 'del';
+    delBtn.textContent = 'Hapus';
+    delBtn.addEventListener('click', async () => {
+      if (!window.confirm(`Hapus "${item.name}"?`)) return;
+      const current = await readSaved();
+      await writeSaved(current.filter((row2) => row2.id !== item.id));
+      await renderSaved();
+      setStatus('Hasil dihapus.', 'ok');
+    });
+    row.appendChild(delBtn);
+
+    savedListEl.appendChild(row);
+  }
+}
+
+saveBtn.addEventListener('click', async () => {
+  const urls = outEl.value.split('\n').map((u) => u.trim()).filter(Boolean);
+  if (urls.length === 0) {
+    setStatus('Tidak ada URL untuk disimpan.', 'err');
+    return;
+  }
+
+  // Nama diusulkan dari judul tab supaya tidak perlu mengetik dari nol,
+  // sekaligus menandai profil asalnya.
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  const suggested = (tab?.title ?? '').split('|')[0].trim().slice(0, 40);
+  const name = window.prompt('Simpan sebagai:', suggested || 'Tanpa nama');
+  if (name === null) return;
+
+  const list = await readSaved();
+  list.unshift({
+    id: String(Date.now()),
+    name: name.trim() || 'Tanpa nama',
+    urls,
+    savedAt: new Date().toISOString(),
+  });
+
+  const dropped = Math.max(0, list.length - MAX_SAVED);
+  await writeSaved(list);
+  await renderSaved();
+  setStatus(
+    dropped > 0
+      ? `${urls.length} URL disimpan. ${dropped} catatan terlama dibuang (batas ${MAX_SAVED}).`
+      : `${urls.length} URL disimpan.`,
+    'ok',
+  );
+});
+
+void renderSaved();
