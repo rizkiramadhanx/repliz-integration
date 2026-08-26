@@ -6,6 +6,7 @@ import useMutateImportUrls, {
   useGetMediaCleanupPreview,
   useMutateMediaCleanup,
   useMutateCancelImportJob,
+  useMutateDeleteImportJob,
 } from "@/features/url-import/hooks/useMutateImportUrls";
 import dayjs from "@/libs/dayjs";
 import {
@@ -100,6 +101,8 @@ export default function PageUrlImport() {
     useMutateMediaCleanup();
   const { mutate: cancelJob, isPending: isCanceling } =
     useMutateCancelImportJob();
+  const { mutate: deleteJob, isPending: isDeleting } =
+    useMutateDeleteImportJob();
   const cleanup = dataCleanup?.data;
   const { data: dataJob, refetch: refetchJob } = useGetImportJob(1, 5);
   const jobs = dataJob?.data?.data ?? [];
@@ -183,22 +186,71 @@ export default function PageUrlImport() {
     );
   };
 
+  // Yang dihapus hanya catatan batch di sisi kita; jadwal yang terlanjur
+  // dibuat tetap ada di Repliz dan harus dihapus dari sana bila tak
+  // diinginkan. Ditegaskan di konfirmasi supaya tidak dikira membatalkan.
+  const handleDeleteJob = (job: {
+    id: string;
+    total: number;
+    success: number;
+    replizAccountName?: string | null;
+  }) => {
+    const confirmed = window.confirm(
+      `Hapus catatan batch impor ini?\n\n` +
+        `Akun: ${job.replizAccountName ?? "-"}\n` +
+        `${job.success} dari ${job.total} URL sudah dijadwalkan.\n\n` +
+        `Jadwal yang SUDAH dibuat TETAP ADA di Repliz — hapus dari sana ` +
+        `bila memang tidak diinginkan.`,
+    );
+    if (!confirmed) return;
+
+    deleteJob(job.id, {
+      onSuccess: (res) => {
+        void refetchJob();
+        void refetchHistory();
+        notifications.show({
+          title: "Batch dihapus",
+          message: res.message,
+          color: "green",
+        });
+      },
+      onError: (err: unknown) => {
+        const axErr = err as { response?: { data?: { message?: string } } };
+        notifications.show({
+          title: "Gagal",
+          message: axErr?.response?.data?.message ?? "Gagal menghapus batch",
+          color: "red",
+        });
+      },
+    });
+  };
+
   // URL yang sudah terjadwal tetap ada di Repliz — yang dibatalkan hanya
   // sisa URL yang belum diproses. Ditegaskan di konfirmasi supaya tidak
   // dikira membatalkan seluruh impor.
-  const handleCancelJob = () => {
-    if (!runningJob) return;
-    const remaining = runningJob.total - runningJob.processed;
+  // Menerima job mana pun, bukan hanya yang pertama ditemukan: beberapa
+  // batch bisa berjalan bersamaan, dan tiap barisnya perlu bisa dihentikan
+  // sendiri-sendiri dari tabel.
+  const handleCancelJob = (job: {
+    id: string;
+    total: number;
+    processed: number;
+    success: number;
+    failed: number;
+    replizAccountName?: string | null;
+  }) => {
+    const remaining = job.total - job.processed;
     const confirmed = window.confirm(
       `Hentikan impor yang sedang berjalan?\n\n` +
-        `${runningJob.processed} dari ${runningJob.total} URL sudah diproses ` +
-        `(${runningJob.success} berhasil, ${runningJob.failed} gagal).\n` +
+        `Akun: ${job.replizAccountName ?? "-"}\n` +
+        `${job.processed} dari ${job.total} URL sudah diproses ` +
+        `(${job.success} berhasil, ${job.failed} gagal).\n` +
         `${remaining} URL sisanya tidak akan diproses.\n\n` +
         `Jadwal yang SUDAH dibuat tetap ada di Repliz.`,
     );
     if (!confirmed) return;
 
-    cancelJob(runningJob.id, {
+    cancelJob(job.id, {
       onSuccess: (res) => {
         void refetchJob();
         notifications.show({
@@ -499,7 +551,7 @@ export default function PageUrlImport() {
                 color="red"
                 variant="light"
                 size="xs"
-                onClick={handleCancelJob}
+                onClick={() => handleCancelJob(runningJob)}
                 loading={isCanceling}
               >
                 Hentikan
@@ -622,6 +674,27 @@ export default function PageUrlImport() {
                             Ulangi ({job.total - job.success})
                             </Button>
                           )}
+                        {job.status === "running" ? (
+                          <Button
+                            size="compact-xs"
+                            variant="light"
+                            color="red"
+                            loading={isCanceling}
+                            onClick={() => handleCancelJob(job)}
+                          >
+                            Hentikan
+                          </Button>
+                        ) : (
+                          <Button
+                            size="compact-xs"
+                            variant="subtle"
+                            color="red"
+                            loading={isDeleting}
+                            onClick={() => handleDeleteJob(job)}
+                          >
+                            Hapus
+                          </Button>
+                        )}
                       </Group>
                     </Table.Td>
                   </Table.Tr>

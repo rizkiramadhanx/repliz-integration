@@ -65,6 +65,12 @@ type ResolvedMedia = {
 // berikutnya di tengah jalan.
 const MAX_SLOTS_PER_DAY = 24;
 
+// Kegagalan beruntun sebanyak ini menghentikan job. Kegagalan berturut-turut
+// hampir selalu berarti masalah menyeluruh — kuota Repliz habis, kredensial
+// ditolak, atau jaringan putus — bukan URL yang kebetulan rusak satu per satu.
+// Meneruskan ratusan URL sisanya hanya membuang waktu dan ruang disk.
+const MAX_CONSECUTIVE_FAILURES = 20;
+
 // Batas URL per satu kali impor. Tiap URL mengunduh media ke disk VPS, jadi
 // batas ini menjaga ruang penyimpanan sekaligus memori proses.
 const MAX_URLS_PER_IMPORT = 2000;
@@ -88,6 +94,11 @@ export class UrlImportService implements OnModuleInit {
   // itu sendiri: pembatalan hanya bermakna bagi proses yang sedang
   // menjalankannya. Restart server sudah menghentikan job dengan sendirinya.
   private readonly cancelRequested = new Set<string>();
+
+  // Job yang dihentikan sendiri oleh sistem karena kegagalan beruntun.
+  // Dipisahkan dari cancelRequested supaya ringkasannya bisa menyebut alasan
+  // yang benar: dihentikan sistem, bukan dibatalkan pengguna.
+  private readonly autoStopped = new Set<string>();
 
   constructor(
     private readonly replizService: ReplizService,
@@ -201,10 +212,11 @@ export class UrlImportService implements OnModuleInit {
       // di tengah jalan tidak boleh dilaporkan 'done', karena sebagian URL
       // memang belum sempat diproses.
       const wasCanceled = this.isCancelRequested(jobId);
+      const wasAutoStopped = this.autoStopped.has(jobId);
       const remaining = params.urls.length - results.length;
 
       await this.jobRepo.update(jobId, {
-        status: wasCanceled ? 'canceled' : 'done',
+        status: wasCanceled || wasAutoStopped ? 'canceled' : 'done',
         processed: results.length,
         success: succeeded,
         failed,
@@ -214,8 +226,14 @@ export class UrlImportService implements OnModuleInit {
           if (failed > 0) bagian.push(`${failed} gagal`);
           if (skipped > 0)
             bagian.push(`${skipped} dilewati (sudah pernah diimpor)`);
-          if (wasCanceled) bagian.push(`${remaining} belum diproses`);
+          if (wasCanceled || wasAutoStopped)
+            bagian.push(`${remaining} belum diproses`);
           const ringkasan = bagian.join(', ');
+          if (wasAutoStopped)
+            return (
+              `Dihentikan otomatis setelah ${MAX_CONSECUTIVE_FAILURES} URL ` +
+              `gagal berturut-turut: ${ringkasan}`
+            );
           return wasCanceled ? `Dihentikan: ${ringkasan}` : ringkasan;
         })(),
       });
@@ -236,12 +254,15 @@ export class UrlImportService implements OnModuleInit {
       // Tanpa ini, id job menumpuk di memori selamanya — dan job baru yang
       // kebetulan memakai id sama akan langsung dianggap dibatalkan.
       this.cancelRequested.delete(jobId);
+      this.autoStopped.delete(jobId);
     }
   }
 
   // URL dinormalkan lebih dulu supaya bentuk yang berbeda-beda (dengan query
   // pelacakan, tanpa https, atau berupa tautan pendek) tetap dikenali.
-  private detectPlatform(url: string): 'tiktok' | 'instagram' | 'facebook' | null {
+  private detectPlatform(
+    url: string,
+  ): 'tiktok' | 'instagram' | 'facebook' | null {
     if (/tiktok\.com/i.test(url)) return 'tiktok';
     if (/instagram\.com/i.test(url)) return 'instagram';
     if (/facebook\.com/i.test(url)) return 'facebook';
@@ -327,12 +348,20 @@ export class UrlImportService implements OnModuleInit {
           )
         : [];
       if (images.length > 0) {
-        return { mediaUrls: images, caption: data?.title ?? '', isVideo: false };
+        return {
+          mediaUrls: images,
+          caption: data?.title ?? '',
+          isVideo: false,
+        };
       }
 
       const mediaUrl = data?.video || data?.video_hd;
       if (!mediaUrl) throw new Error('URL video TikTok tidak ditemukan');
-      return { mediaUrls: [mediaUrl], caption: data?.title ?? '', isVideo: true };
+      return {
+        mediaUrls: [mediaUrl],
+        caption: data?.title ?? '',
+        isVideo: true,
+      };
     }
 
     // Dua downloader dengan layanan hulu BERBEDA: `igdl`/`fbdl` memakai
@@ -419,10 +448,7 @@ export class UrlImportService implements OnModuleInit {
     if (images.length > 0) {
       return {
         mediaUrls: images,
-        caption: this.normalizeCaption(
-          body.data.title,
-          body.data.content_desc,
-        ),
+        caption: this.normalizeCaption(body.data.title, body.data.content_desc),
         isVideo: false,
       };
     }
@@ -635,6 +661,7 @@ export class UrlImportService implements OnModuleInit {
     const usedPerDay = await this.countScheduledPerDay(replizAccountId);
     let slotIndex = 0;
     let processed = 0;
+    let consecutiveFailures = 0;
 
     for (const url of urls) {
       // Diperiksa sebelum pekerjaan berat dimulai, bukan sesudah: unduhan
@@ -758,6 +785,7 @@ export class UrlImportService implements OnModuleInit {
           scheduledAt: scheduledAt.toISOString(),
           caption: media.caption,
         });
+        consecutiveFailures = 0;
       } catch (error) {
         // Satu URL gagal tidak menghentikan sisanya; hasilnya dilaporkan
         // per URL supaya pengguna tahu mana yang perlu diulang.
@@ -783,9 +811,19 @@ export class UrlImportService implements OnModuleInit {
           .catch(() => undefined);
 
         results.push({ url, ok: false, error: message });
+        consecutiveFailures += 1;
       }
 
       processed += 1;
+
+      if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+        if (jobId) this.autoStopped.add(jobId);
+        this.logger.error(
+          `Job impor ${jobId ?? '(tanpa job)'} dihentikan otomatis: ` +
+            `${consecutiveFailures} URL gagal berturut-turut`,
+        );
+        break;
+      }
 
       if (jobId) {
         // Kemajuan disimpan tiap batch, bukan tiap URL: menulis ribuan kali

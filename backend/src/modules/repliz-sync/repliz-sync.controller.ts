@@ -509,6 +509,39 @@ export class ReplizSyncController {
 
   // Mengulang URL yang gagal pada satu job, tanpa menyentuh yang sudah
   // berhasil — supaya tidak ada jadwal ganda.
+  // Menghapus catatan batch impor dari daftar. Jadwal yang sudah dibuat di
+  // Repliz TIDAK ikut terhapus — yang dibuang hanya riwayat di sisi kita,
+  // supaya tabel batch tidak menumpuk. Job yang masih berjalan harus
+  // dihentikan lebih dulu agar tidak menulis ke baris yang sudah hilang.
+  @Delete('import-job/:id')
+  @Permissions('repliz-sync:delete')
+  async deleteImportJob(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const job = await this.importJobRepo.findOne({ where: { id } });
+    if (!job) {
+      res.status(HttpStatus.NOT_FOUND);
+      return createErrorResponse('Job tidak ditemukan', HttpStatus.NOT_FOUND);
+    }
+    if (job.status === 'running') {
+      res.status(HttpStatus.BAD_REQUEST);
+      return createErrorResponse(
+        'Job masih berjalan — hentikan dulu sebelum menghapus',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    // Baris riwayat dilepas dari job, bukan ikut dihapus: riwayat itu bukti
+    // URL mana yang sudah pernah dijadwalkan, dan menghapusnya membuat URL
+    // yang sama terimpor ulang di kemudian hari.
+    await this.importHistoryRepo.update({ jobId: id }, { jobId: null });
+    await this.importJobRepo.delete(id);
+
+    res.status(HttpStatus.OK);
+    return createSuccessResponse('Batch impor dihapus', { jobId: id });
+  }
+
   @Post('import-job/:id/retry')
   @Permissions('repliz-sync:create')
   async retryFailedImports(
@@ -569,10 +602,10 @@ export class ReplizSyncController {
       });
 
       res.status(HttpStatus.ACCEPTED);
-      return createSuccessResponse(
-        `${urls.length} URL gagal sedang diulang`,
-        { jobId: retryJob.id, total: retryJob.total },
-      );
+      return createSuccessResponse(`${urls.length} URL gagal sedang diulang`, {
+        jobId: retryJob.id,
+        total: retryJob.total,
+      });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Gagal mengulang';
       res.status(HttpStatus.BAD_REQUEST);

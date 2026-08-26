@@ -183,6 +183,21 @@ export function useMutateMediaCleanup() {
   });
 }
 
+export function useMutateDeleteImportJob() {
+  return useMutation({
+    mutationFn: async (jobId: string) => {
+      const response = await axiosInstanceAPI.request<{
+        message: string;
+        data: { jobId: string };
+      }>({
+        method: "DELETE",
+        url: `/api/repliz-sync/import-job/${jobId}`,
+      });
+      return response.data;
+    },
+  });
+}
+
 export function useMutateCancelImportJob() {
   return useMutation({
     mutationFn: async (jobId: string) => {
