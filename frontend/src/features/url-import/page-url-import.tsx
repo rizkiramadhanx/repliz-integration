@@ -30,7 +30,7 @@ import {
 } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { useState } from "react";
-import { TiArrowBack } from "react-icons/ti";
+import { TiArrowBack, TiDownload } from "react-icons/ti";
 import { useNavigate } from "react-router";
 
 // Label akun memakai `name`, bukan `username`: untuk Page Facebook, Repliz
@@ -68,7 +68,7 @@ export default function PageUrlImport() {
   // platform akun tujuan secara otomatis; begitu pengguna mengubahnya,
   // pilihannya dihormati dan tidak ditimpa lagi.
   const [autoAddMusic, setAutoAddMusic] = useState<boolean | null>(null);
-  const [postType, setPostType] = useState<"video" | "reel" | "story">("video");
+  const [postType, setPostType] = useState<"video" | "reel" | "story">("reel");
 
   // Penyaring riwayat, mengikuti pola Konten Tersinkron.
   const [dateFrom, setDateFrom] = useState("");
@@ -285,12 +285,27 @@ export default function PageUrlImport() {
         </Text>
         <List size="sm" spacing={2} mt={4}>
           <List.Item>
-            Pasang extension dari folder <Code>browser-extension/</Code> lewat{" "}
-            <Code>chrome://extensions</Code> → Load unpacked
+            Unduh extension lewat tombol di bawah, ekstrak zip-nya, lalu pasang
+            lewat <Code>chrome://extensions</Code> → Load unpacked
+          </List.Item>
+          <List.Item>
+            Isi <Code>config.js</Code> di dalam folder itu dengan kredensial
+            Repliz dan login backend Anda — bawaannya masih placeholder
           </List.Item>
           <List.Item>Buka profil target, scroll secukupnya</List.Item>
           <List.Item>Klik ikon extension → Ambil URL → Salin</List.Item>
         </List>
+        <Button
+          component="a"
+          href="/ternak-sosmed-extension.zip"
+          download
+          size="xs"
+          variant="light"
+          leftSection={<TiDownload />}
+          mt={10}
+        >
+          Unduh extension (.zip)
+        </Button>
       </Alert>
 
       {cleanup && (
