@@ -148,6 +148,8 @@ export type typeMediaCleanupPreview = {
   staleBytes: number;
   keptInUse: number;
   cutoff: string;
+  // null bila kapasitas disk tidak terbaca di server.
+  disk: { totalBytes: number; freeBytes: number; usedBytes: number } | null;
   files: { filename: string; bytes: number; modifiedAt: string }[];
 };
 

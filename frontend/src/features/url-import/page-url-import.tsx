@@ -310,7 +310,15 @@ export default function PageUrlImport() {
 
       {cleanup && (
         <Alert
-          color={cleanup.staleFiles > 0 ? "orange" : "gray"}
+          // Disk hampir penuh lebih mendesak daripada sekadar ada berkas
+          // basi: impor berikutnya gagal total kalau ruang habis.
+          color={
+            cleanup.disk && cleanup.disk.freeBytes / cleanup.disk.totalBytes < 0.1
+              ? "red"
+              : cleanup.staleFiles > 0
+                ? "orange"
+                : "gray"
+          }
           variant="light"
           mb={16}
           title="Penyimpanan media di server"
@@ -321,6 +329,26 @@ export default function PageUrlImport() {
                 Total <b>{cleanup.totalFiles} berkas</b> (
                 {formatBytes(cleanup.totalBytes)}) tersimpan di disk server.
               </Text>
+              {cleanup.disk && (
+                <Text size="sm" mt={2}>
+                  Sisa ruang disk:{" "}
+                  <b
+                    style={{
+                      color:
+                        cleanup.disk.freeBytes / cleanup.disk.totalBytes < 0.1
+                          ? "var(--mantine-color-red-7)"
+                          : undefined,
+                    }}
+                  >
+                    {formatBytes(cleanup.disk.freeBytes)}
+                  </b>{" "}
+                  dari {formatBytes(cleanup.disk.totalBytes)} (terpakai{" "}
+                  {Math.round(
+                    (cleanup.disk.usedBytes / cleanup.disk.totalBytes) * 100,
+                  )}
+                  %)
+                </Text>
+              )}
               <Text size="sm" c="dimmed">
                 {cleanup.staleFiles > 0 ? (
                   <>

@@ -2,7 +2,9 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { MoreThanOrEqual, Repository } from 'typeorm';
 import { UrlImportHistoryEntity } from './entities/url-import-history.entity';
+import { statfs } from 'fs/promises';
 import {
+  REPLIZ_MEDIA_DIR,
   deleteMediaFiles,
   listMediaFiles,
   mediaFilenameFromUrl,
@@ -15,6 +17,10 @@ export type MediaCleanupPreview = {
   staleBytes: number;
   keptInUse: number;
   cutoff: string;
+  // Kapasitas disk tempat media disimpan. null bila tidak terbaca (statfs
+  // bisa gagal di sebagian filesystem/container) — UI menyembunyikannya
+  // ketimbang menampilkan angka nol yang menyesatkan.
+  disk: { totalBytes: number; freeBytes: number; usedBytes: number } | null;
   files: { filename: string; bytes: number; modifiedAt: string }[];
 };
 
@@ -60,6 +66,31 @@ export class MediaCleanupService {
     return inUse;
   }
 
+  // Sisa ruang disk yang menampung folder media. Dipakai UI supaya pengguna
+  // tahu kapan harus membersihkan — ukuran folder media saja tidak cukup,
+  // karena yang menentukan impor gagal adalah penuhnya disk VPS.
+  private async diskUsage(): Promise<{
+    totalBytes: number;
+    freeBytes: number;
+    usedBytes: number;
+  } | null> {
+    try {
+      const stat = await statfs(REPLIZ_MEDIA_DIR);
+      const totalBytes = stat.blocks * stat.bsize;
+      // bavail (bukan bfree): sebagian blok dicadangkan untuk root dan tidak
+      // bisa dipakai proses biasa, jadi bfree melebih-lebihkan sisa nyata.
+      const freeBytes = stat.bavail * stat.bsize;
+      return { totalBytes, freeBytes, usedBytes: totalBytes - freeBytes };
+    } catch (error) {
+      this.logger.warn(
+        `Tidak bisa membaca kapasitas disk: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return null;
+    }
+  }
+
   private cutoffDate(): Date {
     return new Date(Date.now() - SAFETY_HOURS * 60 * 60 * 1000);
   }
@@ -76,6 +107,7 @@ export class MediaCleanupService {
     );
 
     return {
+      disk: await this.diskUsage(),
       totalFiles: files.length,
       totalBytes: files.reduce((sum, file) => sum + file.bytes, 0),
       staleFiles: stale.length,
