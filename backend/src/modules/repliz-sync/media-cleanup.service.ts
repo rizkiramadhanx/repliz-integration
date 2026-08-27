@@ -34,7 +34,13 @@ export type MediaCleanupResult = {
 // Media yang jadwalnya belum lewat masih akan diunduh server Repliz saat
 // postingan terbit, jadi berkasnya tidak boleh dihapus lebih dulu. Jeda ini
 // memberi bantalan untuk jadwal yang baru saja terbit atau tertunda.
-const SAFETY_HOURS = 48;
+//
+// 24 jam, bukan 48: disk VPS lebih cepat penuh daripada bantalannya terpakai.
+// Memperpendeknya aman karena berkas yang masih ditunggu jadwal PENDING di
+// Repliz sudah dilindungi terpisah lewat filenamesScheduledInRepliz() —
+// bantalan ini hanya menangani jadwal yang SUDAH terbit tetapi mungkin masih
+// diunduh ulang Repliz.
+const SAFETY_HOURS = 24;
 
 @Injectable()
 export class MediaCleanupService {
